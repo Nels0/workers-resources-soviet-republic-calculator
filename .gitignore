@@ -4,9 +4,6 @@ __pycache__/
 *.egg-info/
 .venv/
 
-# Backend data
-backend/data/*.db
-
 # Node
 node_modules/
 dist/

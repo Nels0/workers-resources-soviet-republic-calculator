@@ -1,0 +1,511 @@
+/* Windows 95 global styles */
+
+:root {
+  --win95-bg: #c0c0c0;
+  --win95-dark: #404040;
+  --win95-light: #ffffff;
+  --win95-shadow: #808080;
+  --win95-blue: #000080;
+  --win95-blue-light: #1084d0;
+  --win95-font: 'MS Sans Serif', 'Microsoft Sans Serif', Tahoma, Geneva, sans-serif;
+  --win95-base-size: 14.3px; /* 11px * 1.3 */
+}
+
+body {
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  background: #008080;
+  margin: 0;
+  color: black;
+}
+
+/* Navbar as Win95 taskbar */
+
+.win95-taskbar {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.win95-start-btn {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  padding: 2px 8px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  font-weight: bold;
+  cursor: pointer;
+  color: black;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.win95-start-btn:hover {
+  color: black;
+  text-decoration: none;
+}
+
+.win95-start-btn:active,
+.win95-start-btn.active {
+  border-top: 2px solid var(--win95-dark);
+  border-left: 2px solid var(--win95-dark);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+}
+
+.win95-taskbar-sep {
+  width: 1px;
+  height: 24px;
+  border-left: 1px solid var(--win95-shadow);
+  border-right: 1px solid var(--win95-light);
+  margin: 0 4px;
+}
+
+.win95-nav-btn {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  padding: 2px 12px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  cursor: pointer;
+  color: black;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.win95-nav-btn:hover {
+  color: black;
+  text-decoration: none;
+}
+
+.win95-nav-btn:active,
+.win95-nav-btn.active {
+  border-top: 2px solid var(--win95-dark);
+  border-left: 2px solid var(--win95-dark);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+}
+
+/* Window chrome */
+
+.win95-window {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  padding: 3px;
+}
+
+.win95-titlebar {
+  background: linear-gradient(90deg, var(--win95-blue), var(--win95-blue-light));
+  color: white;
+  font-weight: bold;
+  padding: 3px 6px;
+  margin-bottom: 4px;
+  font-size: calc(var(--win95-base-size) * 1.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.win95-titlebar-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.win95-titlebar-btn {
+  width: 20px;
+  height: 18px;
+  background: var(--win95-bg);
+  border-top: 1px solid var(--win95-light);
+  border-left: 1px solid var(--win95-light);
+  border-bottom: 1px solid var(--win95-dark);
+  border-right: 1px solid var(--win95-dark);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  color: black;
+  cursor: default;
+  padding: 0;
+}
+
+.win95-titlebar-inactive {
+  background: linear-gradient(90deg, #808080, #b0b0b0);
+}
+
+/* Inset panel */
+
+.win95-inset {
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+  background: white;
+}
+
+/* Toolbar */
+
+.win95-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px;
+  flex-wrap: wrap;
+}
+
+.win95-toolbar label {
+  font-weight: bold;
+  margin: 0;
+}
+
+/* Form controls */
+
+.win95-input {
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+  background: white;
+  padding: 2px 4px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  outline: none;
+}
+
+.win95-select {
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+  background: white;
+  padding: 2px 4px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  outline: none;
+}
+
+/* Buttons */
+
+.win95-btn {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  padding: 2px 12px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  cursor: pointer;
+  color: black;
+}
+
+.win95-btn:active {
+  border-top: 2px solid var(--win95-dark);
+  border-left: 2px solid var(--win95-dark);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+}
+
+.win95-btn:disabled {
+  color: var(--win95-shadow);
+}
+
+.win95-btn-default {
+  outline: 1px dotted black;
+  outline-offset: -4px;
+}
+
+/* Status bar */
+
+.win95-statusbar {
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+  padding: 2px 6px;
+  margin-top: 4px;
+  background: var(--win95-bg);
+}
+
+/* Table */
+
+.win95-table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+}
+
+.win95-table {
+  border-collapse: collapse;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.win95-table th {
+  background: var(--win95-bg);
+  border-top: 1px solid var(--win95-light);
+  border-left: 1px solid var(--win95-light);
+  border-bottom: 1px solid var(--win95-dark);
+  border-right: 1px solid var(--win95-dark);
+  padding: 2px 8px;
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: bold;
+}
+
+.win95-table th:hover {
+  background: #d4d0c8;
+}
+
+.win95-table th .sort-arrow {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+.win95-table td {
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--win95-bg);
+}
+
+.win95-table tbody tr:nth-child(even) {
+  background: #f0f0f0;
+}
+
+.win95-table tbody tr:hover {
+  background: var(--win95-blue);
+  color: white;
+}
+
+.win95-table tbody tr:hover a {
+  color: white;
+}
+
+.win95-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.win95-table a {
+  color: var(--win95-blue);
+  text-decoration: none;
+}
+
+.win95-table a:hover {
+  text-decoration: underline;
+}
+
+/* Static table (no sorting, used in detail views) */
+
+.win95-table-static th {
+  cursor: default;
+}
+
+.win95-table-static th:hover {
+  background: var(--win95-bg);
+}
+
+/* Links */
+
+.win95 a {
+  color: var(--win95-blue);
+}
+
+/* Field group (label + value) */
+
+.win95-field {
+  display: inline-block;
+  margin-right: 16px;
+  margin-bottom: 4px;
+}
+
+.win95-field-label {
+  font-weight: bold;
+}
+
+/* Group box */
+
+.win95-groupbox {
+  border: 1px solid var(--win95-shadow);
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.win95-groupbox-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  padding: 2px 4px;
+  background: var(--win95-bg);
+}
+
+/* Dropdown list for autocomplete */
+
+.win95-dropdown {
+  position: absolute;
+  z-index: 1000;
+  width: 100%;
+  background: white;
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.win95-dropdown-item {
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.win95-dropdown-item:hover {
+  background: var(--win95-blue);
+  color: white;
+}
+
+.win95-dropdown-item.disabled {
+  color: var(--win95-shadow);
+  cursor: default;
+}
+
+.win95-dropdown-item.disabled:hover {
+  background: white;
+  color: var(--win95-shadow);
+}
+
+/* Calculator rows */
+
+.win95-calc-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.win95-calc-row .win95-input {
+  flex: 1;
+}
+
+.win95-calc-row .win95-input-qty {
+  width: 80px;
+}
+
+/* Error text */
+
+.win95-error {
+  color: red;
+  font-weight: bold;
+}
+
+.win95-muted {
+  color: var(--win95-shadow);
+}
+
+/* Nav section labels */
+
+.win95-nav-label {
+  font-weight: bold;
+  font-size: calc(var(--win95-base-size) * 0.85);
+  color: var(--win95-dark);
+  padding: 0 2px;
+}
+
+/* Tabs */
+
+.win95-tabs {
+  display: flex;
+  padding: 0 4px;
+  gap: 0;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+}
+
+.win95-tab {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-dark);
+  border-bottom: 1px solid var(--win95-shadow);
+  padding: 2px 12px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  cursor: pointer;
+  color: black;
+  position: relative;
+  top: 1px;
+}
+
+.win95-tab.active {
+  border-bottom: 1px solid var(--win95-bg);
+  background: var(--win95-bg);
+  font-weight: bold;
+}
+
+/* Badge */
+
+.win95-badge {
+  background: var(--win95-bg);
+  border-top: 1px solid var(--win95-light);
+  border-left: 1px solid var(--win95-light);
+  border-bottom: 1px solid var(--win95-dark);
+  border-right: 1px solid var(--win95-dark);
+  padding: 1px 6px;
+  font-size: calc(var(--win95-base-size) * 0.85);
+}
+
+/* Dialog overlay + window */
+
+.win95-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.win95-dialog {
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  padding: 3px;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4);
+}
+
+.win95-dialog-body {
+  padding: 16px 12px 12px;
+}
+
+.win95-dialog-body label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.win95-dialog-body .win95-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.win95-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 12px 12px;
+}

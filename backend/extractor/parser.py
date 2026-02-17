@@ -169,22 +169,26 @@ def _prettify_name(filename: str) -> str:
     return stem.replace("_", " ").title()
 
 
-def parse_building(ini_path: str, bbox_path: str | None = None) -> ParsedBuilding:
+def parse_building(ini_path: str, bbox_path: str | None = None, source_file: str | None = None) -> ParsedBuilding:
     """Parse a single WRSR building .ini file.
 
     If bbox_path is provided (or inferred from ini_path), auto-cost
     calculations will use the 3D geometry.  Without it, only explicit
     $COST_RESOURCE entries are captured.
+
+    source_file overrides the default (basename of ini_path) for display
+    and disambiguation purposes (e.g. 'dlc3/airport_terminal_small').
     """
     if bbox_path is None:
         bbox_path = ini_path.rsplit(".", 1)[0] + ".bbox"
 
     shapes = parse_bbox(bbox_path) if os.path.exists(bbox_path) else {}
     filename = os.path.basename(ini_path)
+    sf = source_file if source_file is not None else filename
 
     building = ParsedBuilding(
-        name=_prettify_name(filename),
-        source_file=filename,
+        name=_prettify_name(sf),
+        source_file=sf,
     )
 
     types_found: list[str] = []
@@ -252,7 +256,7 @@ def parse_building(ini_path: str, bbox_path: str | None = None) -> ParsedBuildin
         # Flush any remaining autos from the last phase
         flush_autos()
 
-    building.category = _guess_category(types_found, filename)
+    building.category = _guess_category(types_found, sf)
     return building
 
 
@@ -271,4 +275,28 @@ def parse_buildings_dir(buildings_dir: str) -> list[ParsedBuilding]:
             results.append(building)
         except Exception as exc:
             print(f"Warning: failed to parse {filename}: {exc}")
+    return results
+
+
+def parse_dlc_buildings_dir(dlc_buildings_dir: str, dlc_name: str) -> list[ParsedBuilding]:
+    """Parse DLC buildings from a nested directory structure.
+
+    Each building is in its own subdirectory containing building.ini.
+    source_file is set to '{dlc_name}/{subdir_name}'.
+    """
+    results: list[ParsedBuilding] = []
+    for subdir in sorted(os.listdir(dlc_buildings_dir)):
+        subdir_path = os.path.join(dlc_buildings_dir, subdir)
+        if not os.path.isdir(subdir_path):
+            continue
+        ini_path = os.path.join(subdir_path, "building.ini")
+        if not os.path.exists(ini_path):
+            continue
+        bbox_path = os.path.join(subdir_path, "building.bbox")
+        source_file = f"{dlc_name}/{subdir}"
+        try:
+            building = parse_building(ini_path, bbox_path, source_file=source_file)
+            results.append(building)
+        except Exception as exc:
+            print(f"Warning: failed to parse {source_file}: {exc}")
     return results

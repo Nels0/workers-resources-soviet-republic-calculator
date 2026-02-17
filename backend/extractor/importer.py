@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import init_db, get_session
 from app.models import Building, BuildingCost, Resource
-from extractor.parser import parse_buildings_dir
+from extractor.parser import parse_buildings_dir, parse_dlc_buildings_dir
 from extractor.translations import (
     get_building_display_name,
     get_resource_display_name,
@@ -85,6 +85,19 @@ def import_buildings(buildings_dir: str, game_dir: str | None = None) -> None:
         print(f"No building .ini files found in {buildings_dir}")
         return
 
+    # Add DLC buildings when game_dir is available
+    if game_dir:
+        media_soviet = os.path.join(game_dir, "media_soviet")
+        if os.path.isdir(media_soviet):
+            for entry in sorted(os.listdir(media_soviet)):
+                if not entry.startswith("dlc"):
+                    continue
+                dlc_buildings = os.path.join(media_soviet, entry, "buildings")
+                if os.path.isdir(dlc_buildings):
+                    dlc_parsed = parse_dlc_buildings_dir(dlc_buildings, entry)
+                    print(f"Found {len(dlc_parsed)} buildings in {entry}")
+                    parsed.extend(dlc_parsed)
+
     session = get_session()
     try:
         # Clear existing data
@@ -127,7 +140,7 @@ def import_buildings(buildings_dir: str, game_dir: str | None = None) -> None:
             imported += 1
 
         session.commit()
-        print(f"Imported {imported} buildings from {buildings_dir}")
+        print(f"Imported {imported} buildings total ({len(parsed)} found)")
         print(f"Resources in DB: {session.query(Resource).count()}")
     except Exception:
         session.rollback()

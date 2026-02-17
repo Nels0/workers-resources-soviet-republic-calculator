@@ -54,7 +54,7 @@ cd backend && uv run pytest         # Backend tests
 - Shape: `{ id, name, buildings: [{ buildingId, quantity, position }], prices: { resource_id: price } }`
 - `position` field preserves order and serves as key for update/delete API calls
 - `prices` are per-project; only non-zero prices stored. `GET/PUT /api/projects/<id>/prices`
-- CostCalculator shows paired `Resource (t)` + `Resource (₽)` columns for priced resources, with per-resource and grand total rows
+- CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
 
 ### Testing
 - **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx`

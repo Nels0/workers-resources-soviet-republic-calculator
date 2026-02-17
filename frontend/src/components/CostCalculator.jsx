@@ -146,6 +146,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                 {activeResources.map(r => (
                   <th key={r.id}>{r.name} ({r.unit})</th>
                 ))}
+                {hasAnyPrice && <th>₽ Total</th>}
                 <th></th>
               </tr>
             </thead>
@@ -153,6 +154,13 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
               {projectBuildings.map((pb, i) => {
                 const b = buildingMap[pb.buildingId]
                 if (!b) return null
+                const rowRubleTotal = hasAnyPrice
+                  ? activeResources.reduce((sum, r) => {
+                      const price = parseFloat(prices?.[String(r.id)]) || 0
+                      const amt = (b.resource_costs[String(r.id)] || 0) * pb.quantity
+                      return sum + (price > 0 ? amt * price : 0)
+                    }, 0)
+                  : 0
                 return (
                   <tr key={i}>
                     <td>
@@ -183,6 +191,11 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                         </td>
                       )
                     })}
+                    {hasAnyPrice && (
+                      <td className="num" style={{ color: '#000080', fontWeight: 'bold' }}>
+                        {rowRubleTotal > 0 ? Math.round(rowRubleTotal * 100) / 100 : '—'}
+                      </td>
+                    )}
                     <td>
                       <button className="win95-btn" onClick={() => onRemove(pb.position)}>X</button>
                     </td>
@@ -199,6 +212,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                     {totals[r.id] ? Math.round(totals[r.id] * 100) / 100 : ''}
                   </td>
                 ))}
+                {hasAnyPrice && <td></td>}
                 <td></td>
               </tr>
               {hasAnyPrice && (
@@ -215,12 +229,14 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                     )
                   })}
                   <td></td>
+                  <td></td>
                 </tr>
               )}
               {hasAnyPrice && (
                 <tr style={{ fontWeight: 'bold' }}>
                   <td colSpan={2 + activeResources.length}>Total ₽</td>
                   <td className="num">{totalCost ? Math.round(totalCost * 100) / 100 : ''}</td>
+                  <td></td>
                 </tr>
               )}
             </tfoot>

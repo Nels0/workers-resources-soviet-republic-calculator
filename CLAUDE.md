@@ -22,7 +22,7 @@ cd backend && uv run pytest         # Backend tests
 
 - **Backend:** Flask + SQLAlchemy + SQLite, managed with uv (Python 3.13+)
 - **Frontend:** React 19 + Vite + React Router, managed with npm
-- **Database:** SQLite at `backend/data/wrsr.db`, auto-created on startup
+- **Database:** SQLite at `backend/data/wrsr.db`, tracked in git (committed with game data)
 - **Styling:** Custom Windows 95 theme (`src/win95.css`) — no CSS frameworks
 - **API reference:** [API.md](API.md)
 
@@ -69,8 +69,8 @@ cd backend && uv run pytest         # Backend tests
 - **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs / Resource Prices
 
 ### Game Data Extractor (`backend/extractor/`)
-- `parser.py` — parses `.ini` building files and `.bbox` geometry. Auto-computes costs via `AUTO_DICT`.
-- `importer.py` — CLI entry point (`python -m extractor.importer`). Clears and reimports all data.
+- `parser.py` — parses `.ini` building files and `.bbox` geometry. Auto-computes costs via `AUTO_DICT`. `parse_building` accepts optional `source_file` override for DLC disambiguation.
+- `importer.py` — CLI entry point (`python -m extractor.importer`). Clears and reimports all data. When `--game-dir` is used, also scans `media_soviet/dlc*/buildings/` for DLC buildings (nested structure: `<dlc>/buildings/<subdir>/building.ini`). DLC buildings get `source_file` like `dlc3/airport_terminal_small`.
 - `translations.py` — parses binary `.btf` translation files (UTF-16 BE) for display names.
 - Reference parser at `reference/workers_and_resources/` documents the game file format.
 - `reference/building_samples/` — 216 `.ini` files for all buildings with duplicate display names (copied from game data). Useful for analysing what directives (`$TYPE_`, `$STORAGE`, `$CITIZENS`, `$STYLE_FLAG`, etc.) can distinguish same-named buildings.

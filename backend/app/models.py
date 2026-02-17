@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Float, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -75,6 +75,9 @@ class Project(Base):
     buildings: Mapped[list["ProjectBuilding"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="ProjectBuilding.position"
     )
+    prices: Mapped[list["ProjectResourcePrice"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
     def to_dict(self):
         return {
@@ -84,6 +87,7 @@ class Project(Base):
                 {"buildingId": pb.building_id, "quantity": pb.quantity, "position": pb.position}
                 for pb in self.buildings
             ],
+            "prices": {str(p.resource_id): p.price for p in self.prices},
         }
 
 
@@ -97,3 +101,15 @@ class ProjectBuilding(Base):
     position: Mapped[int] = mapped_column(default=0)
 
     project: Mapped["Project"] = relationship(back_populates="buildings")
+
+
+class ProjectResourcePrice(Base):
+    __tablename__ = "project_resource_prices"
+    __table_args__ = (UniqueConstraint("project_id", "resource_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"))
+    price: Mapped[float] = mapped_column(Float, default=0.0)
+
+    project: Mapped["Project"] = relationship(back_populates="prices")

@@ -77,6 +77,14 @@ export function updateBuildingQtyAPI(projectId, pos, quantity) {
   });
 }
 
+export function updatePricesAPI(projectId, prices) {
+  return fetchJSON(`/projects/${projectId}/prices`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prices }),
+  });
+}
+
 export function importProjectsAPI(projects) {
   return fetchJSON('/projects/import', {
     method: 'POST',

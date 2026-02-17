@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchBuildingsList } from '../api'
 
@@ -61,7 +61,7 @@ function BuildingSearch({ buildings, onAdd }) {
   )
 }
 
-function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
+function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -105,6 +105,25 @@ function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
     return sums
   }, [projectBuildings, buildingMap, activeResources])
 
+  const pricedResourceIds = useMemo(() => {
+    if (!prices) return new Set()
+    return new Set(activeResources.filter(r => parseFloat(prices[String(r.id)]) > 0).map(r => r.id))
+  }, [activeResources, prices])
+
+  const hasAnyPrice = pricedResourceIds.size > 0
+
+  const totalCost = useMemo(() => {
+    if (!hasAnyPrice) return 0
+    let sum = 0
+    for (const r of activeResources) {
+      const price = parseFloat(prices[String(r.id)]) || 0
+      if (price > 0) {
+        sum += totals[r.id] * price
+      }
+    }
+    return sum
+  }, [hasAnyPrice, prices, activeResources, totals])
+
   if (loading) {
     return <div className="win95-statusbar">Loading...</div>
   }
@@ -125,8 +144,12 @@ function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
                 <th>Building</th>
                 <th>Qty</th>
                 {activeResources.map(r => (
-                  <th key={r.id}>{r.name} ({r.unit})</th>
+                  <Fragment key={r.id}>
+                    <th>{r.name} ({r.unit})</th>
+                    {hasAnyPrice && pricedResourceIds.has(r.id) && <th>{r.name} (₽)</th>}
+                  </Fragment>
                 ))}
+                {hasAnyPrice && <th>Total ₽</th>}
                 <th></th>
               </tr>
             </thead>
@@ -134,6 +157,16 @@ function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
               {projectBuildings.map((pb, i) => {
                 const b = buildingMap[pb.buildingId]
                 if (!b) return null
+                let rowCost = 0
+                let hasRowCost = false
+                for (const r of activeResources) {
+                  const amt = (b.resource_costs[String(r.id)] || 0) * pb.quantity
+                  const price = parseFloat(prices?.[String(r.id)]) || 0
+                  if (price > 0 && amt > 0) {
+                    rowCost += amt * price
+                    hasRowCost = true
+                  }
+                }
                 return (
                   <tr key={i}>
                     <td>
@@ -151,13 +184,23 @@ function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
                       />
                     </td>
                     {activeResources.map(r => {
-                      const cost = (b.resource_costs[String(r.id)] || 0) * pb.quantity
+                      const amt = (b.resource_costs[String(r.id)] || 0) * pb.quantity
+                      const price = parseFloat(prices?.[String(r.id)]) || 0
+                      const rubles = price > 0 && amt > 0 ? amt * price : 0
                       return (
-                        <td key={r.id} className="num">
-                          {cost ? Math.round(cost * 100) / 100 : ''}
-                        </td>
+                        <Fragment key={r.id}>
+                          <td className="num">{amt ? Math.round(amt * 100) / 100 : ''}</td>
+                          {hasAnyPrice && pricedResourceIds.has(r.id) && (
+                            <td className="num">{rubles ? Math.round(rubles * 100) / 100 : ''}</td>
+                          )}
+                        </Fragment>
                       )
                     })}
+                    {hasAnyPrice && (
+                      <td className="num">
+                        {hasRowCost ? Math.round(rowCost * 100) / 100 : <span className="win95-muted">--</span>}
+                      </td>
+                    )}
                     <td>
                       <button className="win95-btn" onClick={() => onRemove(pb.position)}>X</button>
                     </td>
@@ -167,11 +210,21 @@ function CostCalculator({ projectBuildings, onUpdateQty, onRemove, onAdd }) {
               <tr style={{ fontWeight: 'bold' }}>
                 <td>Total</td>
                 <td></td>
-                {activeResources.map(r => (
-                  <td key={r.id} className="num">
-                    {totals[r.id] ? Math.round(totals[r.id] * 100) / 100 : ''}
-                  </td>
-                ))}
+                {activeResources.map(r => {
+                  const price = parseFloat(prices?.[String(r.id)]) || 0
+                  const rubleTotal = price > 0 ? totals[r.id] * price : 0
+                  return (
+                    <Fragment key={r.id}>
+                      <td className="num">{totals[r.id] ? Math.round(totals[r.id] * 100) / 100 : ''}</td>
+                      {hasAnyPrice && pricedResourceIds.has(r.id) && (
+                        <td className="num">{rubleTotal ? Math.round(rubleTotal * 100) / 100 : ''}</td>
+                      )}
+                    </Fragment>
+                  )
+                })}
+                {hasAnyPrice && (
+                  <td className="num">{totalCost ? Math.round(totalCost * 100) / 100 : ''}</td>
+                )}
                 <td></td>
               </tr>
             </tbody>

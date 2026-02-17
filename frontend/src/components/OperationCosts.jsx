@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchBuildingsList } from '../api'
 
-function OperationCosts({ projectBuildings }) {
+function OperationCosts({ projectBuildings, prices }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +46,23 @@ function OperationCosts({ projectBuildings }) {
     return sums
   }, [projectBuildings, buildingMap, activeResources])
 
+  const hasAnyPrice = useMemo(() => {
+    if (!prices) return false
+    return activeResources.some(r => parseFloat(prices[String(r.id)]) > 0)
+  }, [prices, activeResources])
+
+  const totalCost = useMemo(() => {
+    if (!hasAnyPrice) return 0
+    let sum = 0
+    for (const r of activeResources) {
+      const price = parseFloat(prices[String(r.id)]) || 0
+      if (price > 0) {
+        sum += totals[r.id] * price
+      }
+    }
+    return sum
+  }, [hasAnyPrice, prices, activeResources, totals])
+
   if (loading) {
     return <div className="win95-statusbar">Loading...</div>
   }
@@ -68,6 +85,7 @@ function OperationCosts({ projectBuildings }) {
             {activeResources.map(r => (
               <th key={r.id}>{r.name} ({r.unit})</th>
             ))}
+            {hasAnyPrice && <th>Total Cost</th>}
           </tr>
         </thead>
         <tbody>
@@ -89,6 +107,23 @@ function OperationCosts({ projectBuildings }) {
                     </td>
                   )
                 })}
+                {hasAnyPrice && (() => {
+                  let rowCost = 0
+                  let hasAnyCost = false
+                  for (const r of activeResources) {
+                    const price = parseFloat(prices[String(r.id)]) || 0
+                    const qty = (b.operation_costs?.[String(r.id)] || 0) * pb.quantity
+                    if (price > 0 && qty > 0) {
+                      rowCost += qty * price
+                      hasAnyCost = true
+                    }
+                  }
+                  return (
+                    <td className="num">
+                      {hasAnyCost ? Math.round(rowCost * 100) / 100 : <span className="win95-muted">--</span>}
+                    </td>
+                  )
+                })()}
               </tr>
             )
           })}
@@ -100,6 +135,11 @@ function OperationCosts({ projectBuildings }) {
                 {totals[r.id] ? Math.round(totals[r.id] * 100) / 100 : ''}
               </td>
             ))}
+            {hasAnyPrice && (
+              <td className="num">
+                {totalCost ? Math.round(totalCost * 100) / 100 : ''}
+              </td>
+            )}
           </tr>
         </tbody>
       </table>

@@ -30,16 +30,16 @@ POST /api/calculate
 
 GET /api/projects
   List all projects, ordered by creation date.
-  Returns: [{ id, name, buildings }]
+  Returns: [{ id, name, buildings, prices }]
 
 POST /api/projects
   Create a new project.
   Body: { name }
-  Returns: { id, name, buildings: [] }
+  Returns: { id, name, buildings: [], prices: {} }
 
 GET /api/projects/<id>
   Single project.
-  Returns: { id, name, buildings: [{ buildingId, quantity, position }] }
+  Returns: { id, name, buildings: [{ buildingId, quantity, position }], prices: { "<resourceId>": price } }
 
 PUT /api/projects/<id>
   Rename a project.
@@ -64,9 +64,18 @@ DELETE /api/projects/<id>/buildings/<position>
   Remove a building at a position.
   Returns: updated project
 
+GET /api/projects/<id>/prices
+  Get resource prices for a project.
+  Returns: { "<resourceId>": price, ... }
+
+PUT /api/projects/<id>/prices
+  Bulk replace resource prices for a project. Zero/null prices are discarded.
+  Body: { prices: { "<resourceId>": price } }
+  Returns: updated project
+
 POST /api/projects/import
   Bulk import projects (used for localStorage migration).
-  Body: { projects: [{ id?, name, buildings: [{ buildingId, quantity }] }] }
+  Body: { projects: [{ id?, name, buildings: [{ buildingId, quantity }], prices?: { "<resourceId>": price } }] }
   Returns: [imported projects]
 
 ## Health

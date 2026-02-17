@@ -10,10 +10,16 @@ const mockApi = vi.hoisted(() => ({
 
 vi.mock('../api', () => mockApi)
 
+const RESOURCES = [
+  { id: 1, name: 'Concrete', type: 'material', unit: 't' },
+  { id: 2, name: 'Steel', type: 'material', unit: 't' },
+]
+
 const BUILDINGS = [
   { id: 1, name: 'Hospital', category: 'health', source_file: 'hospital.ini', workers_needed: 50, resource_costs: {}, operation_costs: {} },
   { id: 2, name: 'Hospital', category: 'health', source_file: 'hospital_v2.ini', workers_needed: 30, resource_costs: {}, operation_costs: {} },
   { id: 3, name: 'Cement plant', category: 'industry', source_file: 'cement_plant.ini', workers_needed: 30, resource_costs: {}, operation_costs: {} },
+  { id: 4, name: 'Factory', category: 'industry', source_file: 'factory.ini', workers_needed: 40, resource_costs: { '1': 100, '2': 50 }, operation_costs: {} },
 ]
 
 function renderCostCalculator(props = {}) {
@@ -118,5 +124,70 @@ describe('CostCalculator source_file display in project table', () => {
 
     const sourceEl = screen.getByText('hospital.ini')
     expect(sourceEl.classList.contains('win95-muted')).toBe(true)
+  })
+})
+
+describe('CostCalculator Total Cost column', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockApi.fetchBuildingsList.mockResolvedValue({ resources: RESOURCES, buildings: BUILDINGS })
+  })
+
+  it('does not show Total ₽ column when no prices set', async () => {
+    renderCostCalculator({
+      projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
+      prices: {},
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Factory')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('Total ₽')).not.toBeInTheDocument()
+  })
+
+  it('shows Total ₽ column when prices are set', async () => {
+    renderCostCalculator({
+      projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
+      prices: { '1': 10 },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Total ₽')).toBeInTheDocument()
+    })
+  })
+
+  it('computes correct row total cost', async () => {
+    // Factory: concrete=100, steel=50. qty=2. price for concrete=10.
+    // Concrete (₽) per row = 100*2*10 = 2000, Total ₽ per row = 2000
+    // Same values in totals row: Concrete (₽) = 2000, Total ₽ = 2000 → 4 cells
+    renderCostCalculator({
+      projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
+      prices: { '1': 10 },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Total ₽')).toBeInTheDocument()
+    })
+
+    const cells = screen.getAllByText('2000')
+    expect(cells.length).toBe(4)
+  })
+
+  it('computes correct grand total with multiple priced resources', async () => {
+    // Factory: concrete=100, steel=50. qty=1. prices: concrete=10, steel=20.
+    // Grand total = 100*1*10 + 50*1*20 = 1000 + 1000 = 2000
+    // "2000" appears in: data row Total ₽, totals row Total ₽ → 2 cells
+    renderCostCalculator({
+      projectBuildings: [{ buildingId: 4, quantity: 1, position: 0 }],
+      prices: { '1': 10, '2': 20 },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Total ₽')).toBeInTheDocument()
+    })
+
+    const cells = screen.getAllByText('2000')
+    expect(cells.length).toBe(2) // data row Total ₽ + totals row Total ₽
   })
 })

@@ -46,12 +46,15 @@ cd backend && uv run pytest         # Backend tests
 - Models serialize via `to_dict()` methods
 - BuildingCost `phase`: `"construction"` or `"operation"`
 - Building search matches on both `name` and `source_file` (OR, case-insensitive)
+- Use `session.execute(sql_delete(Model).where(...))` + `session.flush()` for bulk deletes before inserts — ORM `session.delete()` per-row can cause ordering issues that violate UNIQUE constraints
 
 ### Projects
-- Stored in backend SQLite (`Project` + `ProjectBuilding` models)
+- Stored in backend SQLite (`Project` + `ProjectBuilding` + `ProjectResourcePrice` models)
 - `frontend/src/projectStorage.js` — async wrappers calling project API
-- Shape: `{ id, name, buildings: [{ buildingId, quantity, position }] }`
+- Shape: `{ id, name, buildings: [{ buildingId, quantity, position }], prices: { resource_id: price } }`
 - `position` field preserves order and serves as key for update/delete API calls
+- `prices` are per-project; only non-zero prices stored. `GET/PUT /api/projects/<id>/prices`
+- CostCalculator shows paired `Resource (t)` + `Resource (₽)` columns for priced resources, with per-resource and grand total rows
 
 ### Testing
 - **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx`
@@ -63,7 +66,7 @@ cd backend && uv run pytest         # Backend tests
 
 ### Navigation
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
-- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs
+- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs / Resource Prices
 
 ### Game Data Extractor (`backend/extractor/`)
 - `parser.py` — parses `.ini` building files and `.bbox` geometry. Auto-computes costs via `AUTO_DICT`.

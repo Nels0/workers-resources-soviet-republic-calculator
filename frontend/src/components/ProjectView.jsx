@@ -2,10 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   loadProjects, createProject, deleteProject,
   addBuilding, removeBuilding, updateBuildingQty,
-  migrateFromLocalStorage
+  updatePrices, migrateFromLocalStorage
 } from '../projectStorage'
 import CostCalculator from './CostCalculator'
 import OperationCosts from './OperationCosts'
+import ResourcePrices from './ResourcePrices'
 
 function ProjectView() {
   const [projects, setProjects] = useState([])
@@ -108,6 +109,16 @@ function ProjectView() {
     if (!selectedId) return
     try {
       const updated = await updateBuildingQty(selectedId, position, qty)
+      setProjects(updated)
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [selectedId])
+
+  const handleUpdatePrices = useCallback(async (prices) => {
+    if (!selectedId) return
+    try {
+      const updated = await updatePrices(selectedId, prices)
       setProjects(updated)
     } catch (err) {
       setError(err.message)
@@ -262,19 +273,35 @@ function ProjectView() {
         >
           Operation Costs
         </button>
+        <button
+          className={`win95-tab${activeTab === 'prices' ? ' active' : ''}`}
+          onClick={() => setActiveTab('prices')}
+        >
+          Resource Prices
+        </button>
       </div>
 
       <div style={{ padding: 4 }}>
-        {activeTab === 'construction' ? (
+        {activeTab === 'construction' && (
           <CostCalculator
             projectBuildings={project?.buildings || []}
+            prices={project?.prices || {}}
             onAdd={handleAdd}
             onRemove={handleRemove}
             onUpdateQty={handleUpdateQty}
           />
-        ) : (
+        )}
+        {activeTab === 'operation' && (
           <OperationCosts
             projectBuildings={project?.buildings || []}
+            prices={project?.prices || {}}
+          />
+        )}
+        {activeTab === 'prices' && (
+          <ResourcePrices
+            projectBuildings={project?.buildings || []}
+            prices={project?.prices || {}}
+            onUpdatePrices={handleUpdatePrices}
           />
         )}
       </div>

@@ -1,7 +1,7 @@
 import {
   fetchProjects, createProjectAPI, deleteProjectAPI,
   addBuildingAPI, removeBuildingAPI, updateBuildingQtyAPI,
-  importProjectsAPI,
+  updatePricesAPI, importProjectsAPI,
 } from './api'
 
 const STORAGE_KEY = 'wrsr-projects'
@@ -31,6 +31,11 @@ export async function removeBuilding(projectId, position) {
 
 export async function updateBuildingQty(projectId, position, qty) {
   await updateBuildingQtyAPI(projectId, position, qty)
+  return fetchProjects()
+}
+
+export async function updatePrices(projectId, prices) {
+  await updatePricesAPI(projectId, prices)
   return fetchProjects()
 }
 

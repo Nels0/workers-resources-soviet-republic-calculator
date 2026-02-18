@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import init_db, get_session
-from app.models import Building, BuildingCost, Resource
+from app.models import Building, BuildingCost, BuildingFlow, Resource
 from extractor.parser import parse_buildings_dir, parse_dlc_buildings_dir
 from extractor.translations import (
     get_building_display_name,
@@ -101,6 +101,7 @@ def import_buildings(buildings_dir: str, game_dir: str | None = None) -> None:
     session = get_session()
     try:
         # Clear existing data
+        session.query(BuildingFlow).delete()
         session.query(BuildingCost).delete()
         session.query(Building).delete()
         session.query(Resource).delete()
@@ -136,6 +137,32 @@ def import_buildings(buildings_dir: str, game_dir: str | None = None) -> None:
                     phase="construction",
                 )
                 session.add(cost)
+
+            for res_name, quantity in pb.production.items():
+                if quantity <= 0:
+                    continue
+                if res_name not in resource_cache:
+                    resource_cache[res_name] = get_or_create_resource(session, res_name, translations)
+                flow = BuildingFlow(
+                    building_id=building.id,
+                    resource_id=resource_cache[res_name].id,
+                    quantity=round(quantity, 4),
+                    direction="produces",
+                )
+                session.add(flow)
+
+            for res_name, quantity in pb.consumption.items():
+                if quantity <= 0:
+                    continue
+                if res_name not in resource_cache:
+                    resource_cache[res_name] = get_or_create_resource(session, res_name, translations)
+                flow = BuildingFlow(
+                    building_id=building.id,
+                    resource_id=resource_cache[res_name].id,
+                    quantity=round(quantity, 4),
+                    direction="consumes",
+                )
+                session.add(flow)
 
             imported += 1
 

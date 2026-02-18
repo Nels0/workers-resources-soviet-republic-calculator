@@ -29,8 +29,9 @@ class Building(Base):
     construction_days: Mapped[float] = mapped_column(default=0.0)
 
     costs: Mapped[list["BuildingCost"]] = relationship(back_populates="building", cascade="all, delete-orphan")
+    flows: Mapped[list["BuildingFlow"]] = relationship(back_populates="building", cascade="all, delete-orphan")
 
-    def to_dict(self, include_costs=False):
+    def to_dict(self, include_costs=False, include_flows=False):
         d = {
             "id": self.id,
             "name": self.name,
@@ -41,6 +42,8 @@ class Building(Base):
         }
         if include_costs:
             d["costs"] = [c.to_dict() for c in self.costs]
+        if include_flows:
+            d["flows"] = [f.to_dict() for f in self.flows]
         return d
 
 
@@ -62,6 +65,27 @@ class BuildingCost(Base):
             "resource": self.resource.to_dict() if self.resource else None,
             "quantity": self.quantity,
             "phase": self.phase,
+        }
+
+
+class BuildingFlow(Base):
+    __tablename__ = "building_flows"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    building_id: Mapped[int] = mapped_column(ForeignKey("buildings.id"))
+    resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"))
+    quantity: Mapped[float] = mapped_column(default=0.0)
+    direction: Mapped[str] = mapped_column(String(10))  # "produces" | "consumes"
+
+    building: Mapped["Building"] = relationship(back_populates="flows")
+    resource: Mapped["Resource"] = relationship()
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "resource": self.resource.to_dict() if self.resource else None,
+            "quantity": self.quantity,
+            "direction": self.direction,
         }
 
 

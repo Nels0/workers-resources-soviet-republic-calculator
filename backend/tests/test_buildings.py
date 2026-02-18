@@ -2,7 +2,7 @@ import pytest
 
 from app import create_app
 from app.database import Base, engine, get_session
-from app.models import Building
+from app.models import Building, BuildingFlow, Resource
 
 
 @pytest.fixture
@@ -98,3 +98,80 @@ class TestBuildingSearch:
         resp = seeded_client.get(f"/api/buildings/{building_id}")
         data = resp.get_json()
         assert data["source_file"] == "hospital_v2.ini"
+
+
+@pytest.fixture
+def seeded_client_with_flows(client):
+    """Client with a building, resources, and flow records pre-loaded."""
+    session = get_session()
+    try:
+        cement = Resource(name="Cement", type="material", unit="t")
+        coal = Resource(name="Coal", type="material", unit="t")
+        session.add_all([cement, coal])
+        session.flush()
+
+        plant = Building(name="Cement Plant", category="industry", source_file="cement_plant.ini")
+        other = Building(name="Warehouse", category="industry", source_file="warehouse.ini")
+        session.add_all([plant, other])
+        session.flush()
+
+        session.add_all([
+            BuildingFlow(building_id=plant.id, resource_id=cement.id, quantity=1.5, direction="produces"),
+            BuildingFlow(building_id=plant.id, resource_id=coal.id, quantity=0.086, direction="consumes"),
+        ])
+        session.commit()
+
+        # Store IDs for use in tests
+        client.plant_id = plant.id
+        client.other_id = other.id
+        client.cement_id = cement.id
+        client.coal_id = coal.id
+    finally:
+        session.close()
+    return client
+
+
+class TestBuildingFlows:
+    def test_list_includes_produces_and_consumes_keys(self, seeded_client_with_flows):
+        resp = seeded_client_with_flows.get("/api/buildings")
+        data = resp.get_json()
+        for b in data["buildings"]:
+            assert "produces" in b
+            assert "consumes" in b
+
+    def test_building_without_flows_has_empty_dicts(self, seeded_client_with_flows):
+        resp = seeded_client_with_flows.get("/api/buildings?search=Warehouse")
+        data = resp.get_json()
+        assert len(data["buildings"]) == 1
+        b = data["buildings"][0]
+        assert b["produces"] == {}
+        assert b["consumes"] == {}
+
+    def test_list_produces_and_consumes_keyed_by_resource_id(self, seeded_client_with_flows):
+        resp = seeded_client_with_flows.get("/api/buildings?search=Cement Plant")
+        data = resp.get_json()
+        assert len(data["buildings"]) == 1
+        b = data["buildings"][0]
+        cement_id = str(seeded_client_with_flows.cement_id)
+        coal_id = str(seeded_client_with_flows.coal_id)
+        assert b["produces"] == {cement_id: 1.5}
+        assert b["consumes"] == {coal_id: 0.086}
+
+    def test_detail_includes_flows_array(self, seeded_client_with_flows):
+        plant_id = seeded_client_with_flows.plant_id
+        resp = seeded_client_with_flows.get(f"/api/buildings/{plant_id}")
+        data = resp.get_json()
+        assert "flows" in data
+        assert len(data["flows"]) == 2
+
+    def test_detail_flows_have_direction_quantity_resource(self, seeded_client_with_flows):
+        plant_id = seeded_client_with_flows.plant_id
+        resp = seeded_client_with_flows.get(f"/api/buildings/{plant_id}")
+        flows = resp.get_json()["flows"]
+        directions = {f["direction"] for f in flows}
+        assert directions == {"produces", "consumes"}
+        for f in flows:
+            assert "quantity" in f
+            assert "resource" in f
+            assert f["resource"] is not None
+            assert "name" in f["resource"]

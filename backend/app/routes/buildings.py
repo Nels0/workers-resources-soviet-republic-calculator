@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from ..database import get_session
-from ..models import Building, BuildingCost, Resource
+from ..models import Building, BuildingCost, BuildingFlow, Resource
 
 bp = Blueprint("buildings", __name__)
 
@@ -37,6 +37,15 @@ def list_buildings():
                     operation_map[c.resource_id] = c.quantity
             row["resource_costs"] = {r.id: construction_map.get(r.id, 0) for r in resources}
             row["operation_costs"] = {r.id: operation_map.get(r.id, 0) for r in resources}
+            produces_map = {}
+            consumes_map = {}
+            for f in b.flows:
+                if f.direction == "produces":
+                    produces_map[f.resource_id] = f.quantity
+                elif f.direction == "consumes":
+                    consumes_map[f.resource_id] = f.quantity
+            row["produces"] = produces_map
+            row["consumes"] = consumes_map
             rows.append(row)
 
         return jsonify({"resources": resource_list, "buildings": rows})
@@ -51,7 +60,7 @@ def get_building(building_id):
         building = session.get(Building, building_id)
         if not building:
             return jsonify({"error": "Building not found"}), 404
-        return jsonify(building.to_dict(include_costs=True))
+        return jsonify(building.to_dict(include_costs=True, include_flows=True))
     finally:
         session.close()
 

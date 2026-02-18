@@ -23,16 +23,21 @@ const mockStorage = vi.hoisted(() => ({
   addBuilding: vi.fn(),
   removeBuilding: vi.fn(),
   updateBuildingQty: vi.fn(),
-  updatePrices: vi.fn(),
+  updateCountryPrices: vi.fn(),
   migrateFromLocalStorage: vi.fn(),
 }))
 
 vi.mock('../projectStorage', () => mockStorage)
 
-function renderProjectView() {
+function renderProjectView(props = {}) {
+  const defaults = {
+    countryId: 'c1',
+    prices: {},
+    onUpdatePrices: vi.fn(),
+  }
   return render(
     <MemoryRouter>
-      <ProjectView />
+      <ProjectView {...defaults} {...props} />
     </MemoryRouter>
   )
 }
@@ -52,6 +57,14 @@ describe('ProjectView create project', () => {
       expect(screen.getByText('No projects yet. Create one to start planning.')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'New Project' })).toBeInTheDocument()
+  })
+
+  it('shows no-country state when countryId is null', async () => {
+    renderProjectView({ countryId: null })
+
+    await waitFor(() => {
+      expect(screen.getByText('Select or create a country to start planning.')).toBeInTheDocument()
+    })
   })
 
   it('opens create dialog when New Project button is clicked', async () => {
@@ -103,8 +116,8 @@ describe('ProjectView create project', () => {
     expect(screen.getByRole('button', { name: 'OK' })).toBeEnabled()
   })
 
-  it('calls createProject and refreshes when OK is clicked', async () => {
-    const newProject = { id: 'p1', name: 'My Base', buildings: [] }
+  it('calls createProject with name and countryId when OK is clicked', async () => {
+    const newProject = { id: 'p1', name: 'My Base', buildings: [], country_id: 'c1' }
     mockStorage.loadProjects
       .mockResolvedValueOnce([])          // initial load
       .mockResolvedValueOnce([newProject]) // refresh after create
@@ -112,7 +125,7 @@ describe('ProjectView create project', () => {
 
     const user = userEvent.setup()
 
-    renderProjectView()
+    renderProjectView({ countryId: 'c1' })
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'New Project' })).toBeInTheDocument()
@@ -123,17 +136,16 @@ describe('ProjectView create project', () => {
     await user.click(screen.getByRole('button', { name: 'OK' }))
 
     await waitFor(() => {
-      expect(mockStorage.createProject).toHaveBeenCalledWith('My Base')
+      expect(mockStorage.createProject).toHaveBeenCalledWith('My Base', 'c1')
     })
 
-    // After create, should refresh and show the project
     await waitFor(() => {
       expect(mockStorage.loadProjects).toHaveBeenCalledTimes(2)
     })
   })
 
   it('calls createProject when Enter is pressed in the input', async () => {
-    const newProject = { id: 'p1', name: 'My Base', buildings: [] }
+    const newProject = { id: 'p1', name: 'My Base', buildings: [], country_id: 'c1' }
     mockStorage.loadProjects
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([newProject])
@@ -151,7 +163,7 @@ describe('ProjectView create project', () => {
     await user.type(screen.getByLabelText('Project name:'), 'My Base{Enter}')
 
     await waitFor(() => {
-      expect(mockStorage.createProject).toHaveBeenCalledWith('My Base')
+      expect(mockStorage.createProject).toHaveBeenCalledWith('My Base', 'c1')
     })
   })
 
@@ -195,7 +207,7 @@ describe('ProjectView create project', () => {
   })
 
   it('shows the new project in the selector after creation', async () => {
-    const newProject = { id: 'p1', name: 'My Base', buildings: [] }
+    const newProject = { id: 'p1', name: 'My Base', buildings: [], country_id: 'c1' }
     mockStorage.loadProjects
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([newProject])
@@ -227,11 +239,11 @@ describe('ProjectView Resource Prices tab', () => {
   })
 
   it('renders Resource Prices tab and shows ResourcePrices component when clicked', async () => {
-    const project = { id: 'p1', name: 'Test', buildings: [], prices: {} }
+    const project = { id: 'p1', name: 'Test', buildings: [], country_id: 'c1' }
     mockStorage.loadProjects.mockResolvedValue([project])
     const user = userEvent.setup()
 
-    renderProjectView()
+    renderProjectView({ prices: { '1': 10.0 }, countryId: 'c1' })
 
     await waitFor(() => {
       expect(screen.getByText('Resource Prices')).toBeInTheDocument()

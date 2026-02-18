@@ -1,19 +1,22 @@
 import uuid
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import delete as sql_delete
 
 from ..database import get_session
-from ..models import Project, ProjectBuilding, ProjectResourcePrice
+from ..models import Project, ProjectBuilding
 
 bp = Blueprint("projects", __name__)
 
 
 @bp.route("/api/projects")
 def list_projects():
+    country_id = request.args.get("country_id")
     session = get_session()
     try:
-        projects = session.query(Project).order_by(Project.created_at).all()
+        q = session.query(Project).order_by(Project.created_at)
+        if country_id is not None:
+            q = q.filter(Project.country_id == country_id)
+        projects = q.all()
         return jsonify([p.to_dict() for p in projects])
     finally:
         session.close()
@@ -27,7 +30,11 @@ def create_project():
 
     session = get_session()
     try:
-        project = Project(id=str(uuid.uuid4()), name=data["name"].strip())
+        project = Project(
+            id=str(uuid.uuid4()),
+            name=data["name"].strip(),
+            country_id=data.get("country_id"),
+        )
         session.add(project)
         session.commit()
         return jsonify(project.to_dict()), 201
@@ -147,53 +154,6 @@ def remove_building(project_id, pos):
         session.close()
 
 
-@bp.route("/api/projects/<project_id>/prices")
-def get_prices(project_id):
-    session = get_session()
-    try:
-        project = session.get(Project, project_id)
-        if not project:
-            return jsonify({"error": "Project not found"}), 404
-        return jsonify({str(p.resource_id): p.price for p in project.prices})
-    finally:
-        session.close()
-
-
-@bp.route("/api/projects/<project_id>/prices", methods=["PUT"])
-def update_prices(project_id):
-    data = request.get_json()
-    if not data or "prices" not in data:
-        return jsonify({"error": "Missing 'prices' in request body"}), 400
-
-    session = get_session()
-    try:
-        project = session.get(Project, project_id)
-        if not project:
-            return jsonify({"error": "Project not found"}), 404
-
-        # Clear existing prices with a direct SQL DELETE to avoid ORM ordering issues
-        session.execute(sql_delete(ProjectResourcePrice).where(
-            ProjectResourcePrice.project_id == project_id
-        ))
-        session.flush()
-
-        # Insert non-zero prices
-        for resource_id, price in data["prices"].items():
-            if price:
-                session.add(ProjectResourcePrice(
-                    project_id=project_id,
-                    resource_id=int(resource_id),
-                    price=float(price),
-                ))
-
-        session.commit()
-        # Refresh to pick up new prices
-        session.refresh(project)
-        return jsonify(project.to_dict())
-    finally:
-        session.close()
-
-
 @bp.route("/api/projects/import", methods=["POST"])
 def import_projects():
     data = request.get_json()
@@ -207,6 +167,7 @@ def import_projects():
             project = Project(
                 id=proj_data.get("id", str(uuid.uuid4())),
                 name=proj_data.get("name", "Untitled"),
+                country_id=proj_data.get("country_id"),
             )
             session.add(project)
             for i, b in enumerate(proj_data.get("buildings", [])):
@@ -217,13 +178,6 @@ def import_projects():
                     position=i,
                 )
                 session.add(pb)
-            for resource_id, price in proj_data.get("prices", {}).items():
-                if price:
-                    session.add(ProjectResourcePrice(
-                        project_id=project.id,
-                        resource_id=int(resource_id),
-                        price=float(price),
-                    ))
             imported.append(project)
 
         session.commit()

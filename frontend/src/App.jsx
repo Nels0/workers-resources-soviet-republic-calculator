@@ -1,11 +1,160 @@
+import { useState, useEffect, useRef } from 'react'
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import BuildingList from './components/BuildingList'
 import BuildingDetail from './components/BuildingDetail'
 import ProjectView from './components/ProjectView'
+import CountrySelector from './components/CountrySelector'
+import { fetchCountries, createCountryAPI, deleteCountryAPI, fetchCountryPrices, updateCountryPricesAPI } from './api'
 import './win95.css'
 
 function App() {
   const location = useLocation()
+  const [countries, setCountries] = useState([])
+  const [selectedCountryId, setSelectedCountryId] = useState(null)
+  const [countryPrices, setCountryPrices] = useState({})
+  const [showCountryCreateDialog, setShowCountryCreateDialog] = useState(false)
+  const [showCountryDeleteDialog, setShowCountryDeleteDialog] = useState(false)
+  const [newCountryName, setNewCountryName] = useState('')
+  const [countryError, setCountryError] = useState(null)
+  const newCountryInputRef = useRef(null)
+
+  // Load countries on mount — inline to avoid react-hooks/set-state-in-effect
+  useEffect(() => {
+    fetchCountries()
+      .then(data => {
+        setCountries(data)
+        if (data.length > 0) setSelectedCountryId(data[0].id)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Load country prices when selected country changes
+  useEffect(() => {
+    if (!selectedCountryId) return
+    fetchCountryPrices(selectedCountryId)
+      .then(setCountryPrices)
+      .catch(() => {})
+  }, [selectedCountryId])
+
+  useEffect(() => {
+    if (showCountryCreateDialog && newCountryInputRef.current) {
+      newCountryInputRef.current.focus()
+    }
+  }, [showCountryCreateDialog])
+
+  async function refreshCountries() {
+    const data = await fetchCountries()
+    setCountries(data)
+    return data
+  }
+
+  async function handleCreateCountrySubmit() {
+    const name = newCountryName.trim()
+    if (!name) return
+    setShowCountryCreateDialog(false)
+    try {
+      const c = await createCountryAPI(name)
+      await refreshCountries()
+      setSelectedCountryId(c.id)
+      setCountryError(null)
+    } catch (err) {
+      setCountryError(err.message)
+    }
+  }
+
+  async function handleDeleteCountryConfirm() {
+    setShowCountryDeleteDialog(false)
+    if (!selectedCountryId) return
+    try {
+      await deleteCountryAPI(selectedCountryId)
+      const updated = await refreshCountries()
+      setSelectedCountryId(updated.length > 0 ? updated[0].id : null)
+      setCountryError(null)
+    } catch (err) {
+      setCountryError(err.message)
+    }
+  }
+
+  async function handleUpdateCountryPrices(prices) {
+    if (!selectedCountryId) return
+    try {
+      const updated = await updateCountryPricesAPI(selectedCountryId, prices)
+      setCountryPrices(updated)
+    } catch (err) {
+      setCountryError(err.message)
+    }
+  }
+
+  const selectedCountry = countries.find(c => c.id === selectedCountryId) || null
+  // When no country is selected, show empty prices (avoids stale data)
+  const effectivePrices = selectedCountryId ? countryPrices : {}
+
+  function renderCountryCreateDialog() {
+    if (!showCountryCreateDialog) return null
+    return (
+      <div className="win95-dialog-overlay" onClick={() => setShowCountryCreateDialog(false)}>
+        <div className="win95-dialog" onClick={e => e.stopPropagation()}>
+          <div className="win95-titlebar">
+            <span>New Country</span>
+            <div className="win95-titlebar-buttons">
+              <button className="win95-titlebar-btn" onClick={() => setShowCountryCreateDialog(false)}>X</button>
+            </div>
+          </div>
+          <div className="win95-dialog-body">
+            <label htmlFor="new-country-name">Country name:</label>
+            <input
+              id="new-country-name"
+              ref={newCountryInputRef}
+              className="win95-input"
+              value={newCountryName}
+              onChange={e => setNewCountryName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreateCountrySubmit() }}
+            />
+          </div>
+          <div className="win95-dialog-buttons">
+            <button
+              className="win95-btn win95-btn-default"
+              disabled={!newCountryName.trim()}
+              onClick={handleCreateCountrySubmit}
+            >
+              OK
+            </button>
+            <button className="win95-btn" onClick={() => setShowCountryCreateDialog(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderCountryDeleteDialog() {
+    if (!showCountryDeleteDialog) return null
+    return (
+      <div className="win95-dialog-overlay" onClick={() => setShowCountryDeleteDialog(false)}>
+        <div className="win95-dialog" onClick={e => e.stopPropagation()}>
+          <div className="win95-titlebar">
+            <span>Confirm Delete</span>
+            <div className="win95-titlebar-buttons">
+              <button className="win95-titlebar-btn" onClick={() => setShowCountryDeleteDialog(false)}>X</button>
+            </div>
+          </div>
+          <div className="win95-dialog-body">
+            <p style={{ margin: 0 }}>Delete country &quot;{selectedCountry?.name}&quot;?</p>
+            <p style={{ margin: '8px 0 0', fontSize: '0.9em' }}>All projects in this country must be deleted first.</p>
+          </div>
+          <div className="win95-dialog-buttons">
+            <button className="win95-btn win95-btn-default" onClick={handleDeleteCountryConfirm}>
+              Yes
+            </button>
+            <button className="win95-btn" onClick={() => setShowCountryDeleteDialog(false)}>
+              No
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="win95">
@@ -27,7 +176,21 @@ function App() {
         >
           Projects
         </Link>
+        <div style={{ flex: 1 }} />
+        <div className="win95-taskbar-sep" />
+        <CountrySelector
+          countries={countries}
+          selectedCountryId={selectedCountryId}
+          onSelectCountry={setSelectedCountryId}
+          onNewCountry={() => { setNewCountryName(''); setShowCountryCreateDialog(true) }}
+          onDeleteCountry={() => setShowCountryDeleteDialog(true)}
+        />
       </div>
+
+      {countryError && (
+        <div style={{ padding: '4px 8px', color: 'red', background: '#fff0f0' }}>{countryError}</div>
+      )}
+
       <Routes>
         <Route path="/" element={
           <div style={{ padding: '8px' }}>
@@ -41,10 +204,17 @@ function App() {
         } />
         <Route path="/projects" element={
           <div style={{ padding: '8px' }}>
-            <ProjectView />
+            <ProjectView
+              countryId={selectedCountryId}
+              prices={effectivePrices}
+              onUpdatePrices={handleUpdateCountryPrices}
+            />
           </div>
         } />
       </Routes>
+
+      {renderCountryCreateDialog()}
+      {renderCountryDeleteDialog()}
     </div>
   )
 }

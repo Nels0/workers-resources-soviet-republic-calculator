@@ -26,20 +26,49 @@ POST /api/calculate
   Body: { items: [{ building_id, quantity }] }
   Returns: { totals: [{ resource, phase, total }] }
 
+## Countries
+
+GET /api/countries
+  List all countries, ordered by creation date.
+  Returns: [{ id, name, created_at }]
+
+POST /api/countries
+  Create a new country.
+  Body: { name }
+  Returns: { id, name, created_at }
+
+PUT /api/countries/<id>
+  Rename a country.
+  Body: { name }
+  Returns: updated country
+
+DELETE /api/countries/<id>
+  Delete a country (only if it has no projects).
+  Returns: { ok: true } or 409 if country has projects.
+
+GET /api/countries/<id>/prices
+  Get resource prices for a country.
+  Returns: { "<resourceId>": price, ... }
+
+PUT /api/countries/<id>/prices
+  Bulk replace resource prices for a country. Zero/null prices are discarded.
+  Body: { prices: { "<resourceId>": price } }
+  Returns: { "<resourceId>": price, ... }
+
 ## Projects
 
-GET /api/projects
-  List all projects, ordered by creation date.
-  Returns: [{ id, name, buildings, prices }]
+GET /api/projects?country_id=<id>
+  List projects, optionally filtered by country_id, ordered by creation date.
+  Returns: [{ id, name, country_id, buildings }]
 
 POST /api/projects
   Create a new project.
-  Body: { name }
-  Returns: { id, name, buildings: [], prices: {} }
+  Body: { name, country_id? }
+  Returns: { id, name, country_id, buildings: [] }
 
 GET /api/projects/<id>
   Single project.
-  Returns: { id, name, buildings: [{ buildingId, quantity, position }], prices: { "<resourceId>": price } }
+  Returns: { id, name, country_id, buildings: [{ buildingId, quantity, position }] }
 
 PUT /api/projects/<id>
   Rename a project.
@@ -64,18 +93,9 @@ DELETE /api/projects/<id>/buildings/<position>
   Remove a building at a position.
   Returns: updated project
 
-GET /api/projects/<id>/prices
-  Get resource prices for a project.
-  Returns: { "<resourceId>": price, ... }
-
-PUT /api/projects/<id>/prices
-  Bulk replace resource prices for a project. Zero/null prices are discarded.
-  Body: { prices: { "<resourceId>": price } }
-  Returns: updated project
-
 POST /api/projects/import
   Bulk import projects (used for localStorage migration).
-  Body: { projects: [{ id?, name, buildings: [{ buildingId, quantity }], prices?: { "<resourceId>": price } }] }
+  Body: { projects: [{ id?, name, country_id?, buildings: [{ buildingId, quantity }] }] }
   Returns: [imported projects]
 
 ## Health

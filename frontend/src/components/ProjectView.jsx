@@ -2,13 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   loadProjects, createProject, deleteProject,
   addBuilding, removeBuilding, updateBuildingQty,
-  updatePrices, migrateFromLocalStorage
+  migrateFromLocalStorage
 } from '../projectStorage'
 import CostCalculator from './CostCalculator'
 import OperationCosts from './OperationCosts'
 import ResourcePrices from './ResourcePrices'
 
-function ProjectView() {
+function ProjectView({ countryId, prices = {}, onUpdatePrices }) {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [activeTab, setActiveTab] = useState('construction')
@@ -20,10 +20,11 @@ function ProjectView() {
   const nameInputRef = useRef(null)
 
   const project = projects.find(p => p.id === selectedId) || null
+  const allCountryBuildings = projects.flatMap(p => p.buildings)
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     try {
-      const data = await loadProjects()
+      const data = await loadProjects(countryId)
       setProjects(data)
       setError(null)
       return data
@@ -31,7 +32,7 @@ function ProjectView() {
       setError(err.message)
       return []
     }
-  }
+  }, [countryId])
 
   useEffect(() => {
     async function init() {
@@ -47,7 +48,7 @@ function ProjectView() {
       setLoading(false)
     }
     init()
-  }, [])
+  }, [countryId, refresh])
 
   useEffect(() => {
     if (showCreateDialog && nameInputRef.current) {
@@ -65,7 +66,7 @@ function ProjectView() {
     if (!name) return
     setShowCreateDialog(false)
     try {
-      const p = await createProject(name)
+      const p = await createProject(name, countryId)
       await refresh()
       setSelectedId(p.id)
     } catch (err) {
@@ -77,7 +78,7 @@ function ProjectView() {
     setShowDeleteDialog(false)
     if (!selectedId) return
     try {
-      const updated = await deleteProject(selectedId)
+      const updated = await deleteProject(selectedId, countryId)
       setProjects(updated)
       setSelectedId(updated.length > 0 ? updated[0].id : null)
     } catch (err) {
@@ -88,42 +89,32 @@ function ProjectView() {
   const handleAdd = useCallback(async (buildingId) => {
     if (!selectedId) return
     try {
-      const updated = await addBuilding(selectedId, buildingId)
+      const updated = await addBuilding(selectedId, buildingId, countryId)
       setProjects(updated)
     } catch (err) {
       setError(err.message)
     }
-  }, [selectedId])
+  }, [selectedId, countryId])
 
   const handleRemove = useCallback(async (position) => {
     if (!selectedId) return
     try {
-      const updated = await removeBuilding(selectedId, position)
+      const updated = await removeBuilding(selectedId, position, countryId)
       setProjects(updated)
     } catch (err) {
       setError(err.message)
     }
-  }, [selectedId])
+  }, [selectedId, countryId])
 
   const handleUpdateQty = useCallback(async (position, qty) => {
     if (!selectedId) return
     try {
-      const updated = await updateBuildingQty(selectedId, position, qty)
+      const updated = await updateBuildingQty(selectedId, position, qty, countryId)
       setProjects(updated)
     } catch (err) {
       setError(err.message)
     }
-  }, [selectedId])
-
-  const handleUpdatePrices = useCallback(async (prices) => {
-    if (!selectedId) return
-    try {
-      const updated = await updatePrices(selectedId, prices)
-      setProjects(updated)
-    } catch (err) {
-      setError(err.message)
-    }
-  }, [selectedId])
+  }, [selectedId, countryId])
 
   function renderCreateDialog() {
     if (!showCreateDialog) return null
@@ -186,6 +177,24 @@ function ProjectView() {
               No
             </button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!countryId) {
+    return (
+      <div className="win95-window">
+        <div className="win95-titlebar">
+          <span>Projects</span>
+          <div className="win95-titlebar-buttons">
+            <button className="win95-titlebar-btn">_</button>
+            <button className="win95-titlebar-btn">&square;</button>
+            <button className="win95-titlebar-btn">X</button>
+          </div>
+        </div>
+        <div style={{ padding: 16, textAlign: 'center' }}>
+          <p>Select or create a country to start planning.</p>
         </div>
       </div>
     )
@@ -285,7 +294,7 @@ function ProjectView() {
         {activeTab === 'construction' && (
           <CostCalculator
             projectBuildings={project?.buildings || []}
-            prices={project?.prices || {}}
+            prices={prices}
             onAdd={handleAdd}
             onRemove={handleRemove}
             onUpdateQty={handleUpdateQty}
@@ -294,14 +303,14 @@ function ProjectView() {
         {activeTab === 'operation' && (
           <OperationCosts
             projectBuildings={project?.buildings || []}
-            prices={project?.prices || {}}
+            prices={prices}
           />
         )}
         {activeTab === 'prices' && (
           <ResourcePrices
-            projectBuildings={project?.buildings || []}
-            prices={project?.prices || {}}
-            onUpdatePrices={handleUpdatePrices}
+            projectBuildings={allCountryBuildings}
+            prices={prices}
+            onUpdatePrices={onUpdatePrices}
           />
         )}
       </div>

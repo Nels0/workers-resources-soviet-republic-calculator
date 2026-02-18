@@ -11,6 +11,7 @@ make backend          # Flask on :5000 only
 make frontend         # Vite on :5173 only, proxies /api to :5000
 make reimport            # Reimport game data from known install path
 make import ARGS="--game-dir /path/to/wrsr"  # Import from custom path
+make migrate          # Run DB migration (uv run python backend/migrate_add_countries.py)
 cd frontend && npm run lint
 cd frontend && npm run build
 cd frontend && npm run test         # Vitest unit tests (jsdom, fast)
@@ -48,12 +49,23 @@ cd backend && uv run pytest         # Backend tests
 - Building search matches on both `name` and `source_file` (OR, case-insensitive)
 - Use `session.execute(sql_delete(Model).where(...))` + `session.flush()` for bulk deletes before inserts — ORM `session.delete()` per-row can cause ordering issues that violate UNIQUE constraints
 
+### Countries
+- `Country` model: `{ id (UUID), name, created_at }` — top-level container for projects + prices
+- `CountryResourcePrice`: `{ country_id, resource_id, price }` UNIQUE(country_id, resource_id)
+- Country selector in taskbar (persistent global context); auto-selects first country on load
+- Country delete blocked if it has any projects (returns 409); cascade deletes prices
+- `GET/PUT /api/countries/<id>/prices` — bulk-replace, zero/null discarded
+- Migration: `backend/migrate_add_countries.py` — run once with `make migrate`
+
 ### Projects
-- Stored in backend SQLite (`Project` + `ProjectBuilding` + `ProjectResourcePrice` models)
-- `frontend/src/projectStorage.js` — async wrappers calling project API
-- Shape: `{ id, name, buildings: [{ buildingId, quantity, position }], prices: { resource_id: price } }`
+- Stored in backend SQLite (`Project` + `ProjectBuilding` models)
+- `Project` now has nullable `country_id` FK; no longer has per-project prices
+- `frontend/src/projectStorage.js` — async wrappers; `loadProjects(countryId)`, `createProject(name, countryId)`
+- Shape: `{ id, name, country_id, buildings: [{ buildingId, quantity, position }] }`
 - `position` field preserves order and serves as key for update/delete API calls
-- `prices` are per-project; only non-zero prices stored. `GET/PUT /api/projects/<id>/prices`
+- `GET /api/projects?country_id=<id>` — filter by country
+- Prices are per-country (shared across all projects in a country): `App.jsx` owns `countryPrices` state, fetches on country switch, passes to `ProjectView` as `prices` prop
+- ResourcePrices tab shows buildings from ALL projects in the country (`allCountryBuildings`)
 - CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
 
 ### Testing

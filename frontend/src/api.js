@@ -37,17 +37,48 @@ export function calculateCosts(items) {
   });
 }
 
-// Project API
+// Country API
 
-export function fetchProjects() {
-  return fetchJSON('/projects');
+export function fetchCountries() {
+  return fetchJSON('/countries');
 }
 
-export function createProjectAPI(name) {
-  return fetchJSON('/projects', {
+export function createCountryAPI(name) {
+  return fetchJSON('/countries', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteCountryAPI(id) {
+  return fetchJSON(`/countries/${id}`, { method: 'DELETE' });
+}
+
+export function fetchCountryPrices(countryId) {
+  return fetchJSON(`/countries/${countryId}/prices`);
+}
+
+export function updateCountryPricesAPI(countryId, prices) {
+  return fetchJSON(`/countries/${countryId}/prices`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prices }),
+  });
+}
+
+// Project API
+
+export function fetchProjects(countryId = null) {
+  const qs = countryId ? `?country_id=${encodeURIComponent(countryId)}` : '';
+  return fetchJSON(`/projects${qs}`);
+}
+
+export function createProjectAPI(name, countryId = null) {
+  return fetchJSON('/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, country_id: countryId }),
   });
 }
 
@@ -74,14 +105,6 @@ export function updateBuildingQtyAPI(projectId, pos, quantity) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ quantity }),
-  });
-}
-
-export function updatePricesAPI(projectId, prices) {
-  return fetchJSON(`/projects/${projectId}/prices`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prices }),
   });
 }
 

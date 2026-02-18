@@ -65,29 +65,60 @@ class BuildingCost(Base):
         }
 
 
-class Project(Base):
-    __tablename__ = "projects"
+class Country(Base):
+    __tablename__ = "countries"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
-    buildings: Mapped[list["ProjectBuilding"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan", order_by="ProjectBuilding.position"
-    )
-    prices: Mapped[list["ProjectResourcePrice"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
+    projects: Mapped[list["Project"]] = relationship(back_populates="country")
+    prices: Mapped[list["CountryResourcePrice"]] = relationship(
+        back_populates="country", cascade="all, delete-orphan"
     )
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class CountryResourcePrice(Base):
+    __tablename__ = "country_resource_prices"
+    __table_args__ = (UniqueConstraint("country_id", "resource_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    country_id: Mapped[str] = mapped_column(ForeignKey("countries.id"))
+    resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"))
+    price: Mapped[float] = mapped_column(Float, default=0.0)
+
+    country: Mapped["Country"] = relationship(back_populates="prices")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    country_id: Mapped[str | None] = mapped_column(ForeignKey("countries.id"), nullable=True, default=None)
+
+    buildings: Mapped[list["ProjectBuilding"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", order_by="ProjectBuilding.position"
+    )
+    country: Mapped["Country | None"] = relationship(back_populates="projects")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "country_id": self.country_id,
             "buildings": [
                 {"buildingId": pb.building_id, "quantity": pb.quantity, "position": pb.position}
                 for pb in self.buildings
             ],
-            "prices": {str(p.resource_id): p.price for p in self.prices},
         }
 
 
@@ -101,15 +132,3 @@ class ProjectBuilding(Base):
     position: Mapped[int] = mapped_column(default=0)
 
     project: Mapped["Project"] = relationship(back_populates="buildings")
-
-
-class ProjectResourcePrice(Base):
-    __tablename__ = "project_resource_prices"
-    __table_args__ = (UniqueConstraint("project_id", "resource_id"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
-    resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"))
-    price: Mapped[float] = mapped_column(Float, default=0.0)
-
-    project: Mapped["Project"] = relationship(back_populates="prices")

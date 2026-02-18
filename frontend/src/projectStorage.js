@@ -1,42 +1,41 @@
 import {
   fetchProjects, createProjectAPI, deleteProjectAPI,
   addBuildingAPI, removeBuildingAPI, updateBuildingQtyAPI,
-  updatePricesAPI, importProjectsAPI,
+  updateCountryPricesAPI, importProjectsAPI,
 } from './api'
 
 const STORAGE_KEY = 'wrsr-projects'
 
-export async function loadProjects() {
-  return fetchProjects()
+export async function loadProjects(countryId = null) {
+  return fetchProjects(countryId)
 }
 
-export async function createProject(name) {
-  return createProjectAPI(name)
+export async function createProject(name, countryId = null) {
+  return createProjectAPI(name, countryId)
 }
 
-export async function deleteProject(id) {
+export async function deleteProject(id, countryId = null) {
   await deleteProjectAPI(id)
-  return fetchProjects()
+  return fetchProjects(countryId)
 }
 
-export async function addBuilding(projectId, buildingId) {
+export async function addBuilding(projectId, buildingId, countryId = null) {
   await addBuildingAPI(projectId, buildingId)
-  return fetchProjects()
+  return fetchProjects(countryId)
 }
 
-export async function removeBuilding(projectId, position) {
+export async function removeBuilding(projectId, position, countryId = null) {
   await removeBuildingAPI(projectId, position)
-  return fetchProjects()
+  return fetchProjects(countryId)
 }
 
-export async function updateBuildingQty(projectId, position, qty) {
+export async function updateBuildingQty(projectId, position, qty, countryId = null) {
   await updateBuildingQtyAPI(projectId, position, qty)
-  return fetchProjects()
+  return fetchProjects(countryId)
 }
 
-export async function updatePrices(projectId, prices) {
-  await updatePricesAPI(projectId, prices)
-  return fetchProjects()
+export async function updateCountryPrices(countryId, prices) {
+  return updateCountryPricesAPI(countryId, prices)
 }
 
 export async function migrateFromLocalStorage() {

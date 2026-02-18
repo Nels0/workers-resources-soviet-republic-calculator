@@ -8,10 +8,11 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
 
-    from .routes import buildings, health, projects
+    from .routes import buildings, countries, health, projects
 
     app.register_blueprint(health.bp)
     app.register_blueprint(buildings.bp)
+    app.register_blueprint(countries.bp)
     app.register_blueprint(projects.bp)
 
     init_db()

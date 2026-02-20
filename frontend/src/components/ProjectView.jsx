@@ -4,12 +4,13 @@ import {
   addBuilding, removeBuilding, updateBuildingQty,
   migrateFromLocalStorage
 } from '../projectStorage'
+import { usePersistedState } from '../usePersistedState'
 import CostCalculator from './CostCalculator'
 import OperationCosts from './OperationCosts'
 
 function ProjectView({ countryId, prices = {} }) {
   const [projects, setProjects] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = usePersistedState('wrsr:selectedProjectId', null)
   const [activeTab, setActiveTab] = useState('construction')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -40,7 +41,7 @@ function ProjectView({ countryId, prices = {} }) {
         // migration is best-effort
       }
       const data = await refresh()
-      if (data.length > 0) {
+      if (data.length > 0 && !data.find(p => p.id === selectedId)) {
         setSelectedId(data[0].id)
       }
       setLoading(false)

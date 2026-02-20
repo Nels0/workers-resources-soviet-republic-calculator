@@ -349,6 +349,39 @@ body {
   background: var(--win95-bg);
 }
 
+/* Search results panel (table-style autocomplete) */
+
+.win95-search-results {
+  height: 200px;
+  margin-top: 4px;
+  overflow-y: auto;
+  background: white;
+  border-top: 1px solid var(--win95-shadow);
+  border-left: 1px solid var(--win95-shadow);
+  border-bottom: 1px solid var(--win95-light);
+  border-right: 1px solid var(--win95-light);
+}
+
+/* border-collapse: collapse breaks position: sticky in Firefox;
+   use separate + zero spacing so th headers stay fixed while tbody scrolls */
+.win95-search-results .win95-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.win95-search-results .win95-table th + th {
+  border-left: none;
+}
+
+.win95-table tr.selected td {
+  background: var(--win95-blue);
+  color: white;
+}
+
+.win95-table tr.selected .win95-muted {
+  color: #c0c8e0;
+}
+
 /* Dropdown list for autocomplete */
 
 .win95-dropdown {

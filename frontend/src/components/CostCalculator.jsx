@@ -1,62 +1,97 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchBuildingsList } from '../api'
+import BuildingConstructionTable from './BuildingConstructionTable'
 
-function BuildingSearch({ buildings, onAdd }) {
+function BuildingSearch({ buildings, resources, onAdd }) {
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const wrapperRef = useRef(null)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const tbodyRef = useRef(null)
 
-  const filtered = query
-    ? buildings.filter(b => {
-        const q = query.toLowerCase()
-        return b.name.toLowerCase().includes(q) || (b.source_file || '').toLowerCase().includes(q)
-      })
-    : buildings
+  const filtered = useMemo(() => {
+    const arr = query
+      ? buildings.filter(b => {
+          const q = query.toLowerCase()
+          return b.name.toLowerCase().includes(q) || (b.source_file || '').toLowerCase().includes(q)
+        })
+      : buildings
+    return arr.slice(0, 10)
+  }, [query, buildings])
 
+  // Reset selection when query changes
   useEffect(() => {
-    function handleClick(e) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    setSelectedIndex(0)
+  }, [query])
+
+  // Scroll selected row into view on keyboard navigation
+  useEffect(() => {
+    if (!tbodyRef.current) return
+    const row = tbodyRef.current.children[selectedIndex]
+    if (row?.scrollIntoView) row.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
 
   function handleSelect(id) {
     onAdd(id)
     setQuery('')
-    setOpen(false)
+    setSelectedIndex(0)
+  }
+
+  function tabComplete() {
+    const result = filtered[selectedIndex] || filtered[0]
+    if (!result) return
+    const name = result.name
+    const q = query.toLowerCase()
+    if (name.toLowerCase().startsWith(q)) {
+      const nextSpace = name.indexOf(' ', q.length)
+      setQuery(nextSpace >= 0 ? name.slice(0, nextSpace + 1) : name)
+    } else {
+      setQuery(name)
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex(i => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex(i => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (filtered[selectedIndex]) handleSelect(filtered[selectedIndex].id)
+    } else if (e.key === 'Tab') {
+      if (filtered.length > 0) {
+        e.preventDefault()
+        tabComplete()
+      }
+    }
   }
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', flex: 1 }}>
+    <div>
       <input
         type="text"
         className="win95-input"
         style={{ width: '100%' }}
         placeholder="Search buildings to add..."
         value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
       />
-      {open && query && (
-        <div className="win95-dropdown">
-          {filtered.slice(0, 50).map(b => (
-            <div
-              key={b.id}
-              className="win95-dropdown-item"
-              onClick={() => handleSelect(b.id)}
-            >
-              {b.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="win95-dropdown-item disabled">No matches</div>
-          )}
-        </div>
-      )}
+      <div className="win95-search-results">
+        {filtered.length === 0 ? (
+          <div className="win95-statusbar">No matches</div>
+        ) : (
+          <BuildingConstructionTable
+            buildings={filtered}
+            resources={resources}
+            selectedIndex={selectedIndex}
+            onSelect={handleSelect}
+            onRowHover={setSelectedIndex}
+            tbodyRef={tbodyRef}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -131,7 +166,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
   return (
     <div>
       <div style={{ marginBottom: 8 }}>
-        <BuildingSearch buildings={allBuildings} onAdd={onAdd} />
+        <BuildingSearch buildings={allBuildings} resources={resources} onAdd={onAdd} />
       </div>
 
       {projectBuildings.length === 0 ? (

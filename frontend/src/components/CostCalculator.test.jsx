@@ -56,8 +56,8 @@ describe('BuildingSearch source_file filtering', () => {
       expect(screen.getByText('hospital_v2.ini')).toBeInTheDocument()
     })
     // Should only show the v2 variant, not both Hospitals
-    const items = document.querySelectorAll('.win95-dropdown-item')
-    expect(items).toHaveLength(1)
+    const rows = document.querySelectorAll('.win95-search-results tbody tr')
+    expect(rows).toHaveLength(1)
   })
 
   it('filters by name still works', async () => {
@@ -71,8 +71,8 @@ describe('BuildingSearch source_file filtering', () => {
     await user.type(screen.getByPlaceholderText('Search buildings to add...'), 'Hospital')
 
     await waitFor(() => {
-      const items = document.querySelectorAll('.win95-dropdown-item')
-      expect(items).toHaveLength(2)
+      const rows = document.querySelectorAll('.win95-search-results tbody tr')
+      expect(rows).toHaveLength(2)
     })
   })
 
@@ -118,12 +118,13 @@ describe('CostCalculator source_file display in project table', () => {
       projectBuildings: [{ buildingId: 1, quantity: 1, position: 0 }],
     })
 
+    // hospital.ini appears in both the search panel and the project table
     await waitFor(() => {
-      expect(screen.getByText('hospital.ini')).toBeInTheDocument()
+      expect(screen.getAllByText('hospital.ini').length).toBeGreaterThan(0)
     })
 
-    const sourceEl = screen.getByText('hospital.ini')
-    expect(sourceEl.classList.contains('win95-muted')).toBe(true)
+    const sourceEls = screen.getAllByText('hospital.ini')
+    expect(sourceEls.every(el => el.classList.contains('win95-muted'))).toBe(true)
   })
 })
 
@@ -139,8 +140,9 @@ describe('CostCalculator Total Cost column', () => {
       prices: {},
     })
 
+    // Wait for the project table footer to confirm the table rendered
     await waitFor(() => {
-      expect(screen.getByText('Factory')).toBeInTheDocument()
+      expect(screen.getByText('Total')).toBeInTheDocument()
     })
 
     expect(screen.queryByText('Total ₽')).not.toBeInTheDocument()

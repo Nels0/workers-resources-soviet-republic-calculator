@@ -1,7 +1,7 @@
 .PHONY: backend frontend import reimport migrate dev
 
 backend:
-	cd backend && uv run flask --app app run
+	cd backend && uv run flask --app app run --debug
 
 frontend:
 	cd frontend && npm run dev

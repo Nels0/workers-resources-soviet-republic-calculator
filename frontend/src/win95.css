@@ -284,7 +284,7 @@ body {
 }
 
 .win95-table tbody tr:hover {
-  background: var(--win95-blue);
+  background: var(--win95-shadow);
   color: white;
 }
 

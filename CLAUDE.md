@@ -30,10 +30,12 @@ cd backend && uv run pytest         # Backend tests
 ## Conventions
 
 ### UI / CSS
-- Win95-styled classes from `src/win95.css` (`.win95-window`, `.win95-btn`, `.win95-input`, `.win95-table`, `.win95-tab`, `.win95-dialog`, `.win95-side-panel`, etc.)
+- Win95-styled classes from `src/win95.css` (`.win95-window`, `.win95-btn`, `.win95-input`, `.win95-table`, `.win95-tab`, `.win95-dialog`, `.win95-side-panel`, `.win95-search-results`, etc.)
 - Raised/sunken 3D borders, gray backgrounds (#c0c0c0), blue title bars, inset panels
 - Win95-styled dialogs (`.win95-dialog-overlay` + `.win95-dialog`) — never browser `prompt()`/`confirm()`
 - Win95-styled side panel (`.win95-side-panel` + `.win95-side-panel-body`) — fixed right-side window with titlebar
+- `.win95-search-results` — always-visible in-flow fixed-height (200px) panel with inset border; uses `border-collapse: separate; border-spacing: 0` scoped override to fix Firefox sticky-header bug inside `overflow-y: auto` containers
+- `.win95-table tr.selected td` — keyboard-selection highlight (same blue as hover); `.win95-table tr.selected .win95-muted` — light blue so source_file remains readable
 - Building names display `source_file` alongside (smaller, greyed out via `win95-muted`) to disambiguate duplicates
 - Never use Bootstrap or other CSS frameworks
 
@@ -42,6 +44,7 @@ cd backend && uv run pytest         # Backend tests
 - Never nest component definitions — use render helpers (e.g. `renderSortHeader()`)
 - API calls through `frontend/src/api.js` fetch wrapper
 - `<label htmlFor="id">` + `<select id="id">` required for `getByRole('combobox', { name: /Label/i })` in tests
+- `BuildingConstructionTable` (`components/BuildingConstructionTable.jsx`) — shared Name + Category + sparse resource cost table. Sort mode (`onSort` prop): sortable headers, Link name cells. Select mode (`onSelect` prop): static headers, clickable rows with `selectedIndex` highlight. Used by `BuildingList` (sort mode) and `BuildingSearch` in `CostCalculator` (select mode).
 
 ### Backend
 - Flask blueprints in `app/routes/`, factory in `app/__init__.py`
@@ -72,6 +75,7 @@ cd backend && uv run pytest         # Backend tests
 - `ResourcePrices` component accepts `countryId` + `prices` + `onUpdatePrices`; fetches its own project data via `loadProjects(countryId)` to derive used resources; auto-saves with 600ms debounce (no Save button)
 - Resource name shown as `Name (unit)` — no separate Unit column
 - CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
+- `BuildingSearch` (in `CostCalculator.jsx`): always-visible `.win95-search-results` panel (200px) above the project table; shows first 10 matches as a `BuildingConstructionTable`; arrow keys navigate, Enter adds, Tab completes next word of highlighted result's name
 
 ### Testing
 - **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx`
@@ -79,6 +83,7 @@ cd backend && uv run pytest         # Backend tests
 - **Backend:** pytest with in-memory SQLite. Tests: `backend/tests/`
 - Test cleanup is handled by setup files (`test-setup.js` / `browser-test-setup.js`), not in test files
 - For debounce testing: use real timers with `userEvent.setup({ delay: null })` + `waitFor(..., { timeout: 2000 })` — avoid `vi.useFakeTimers()` before render as it blocks `waitFor` polling
+- Always-visible panels (like `.win95-search-results`) duplicate text that also appears in other parts of the page — use `getAllByText` instead of `getByText` for building names/source_files; guard `scrollIntoView` with `?.scrollIntoView` since jsdom doesn't implement it
 
 ## Architecture
 

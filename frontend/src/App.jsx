@@ -4,6 +4,7 @@ import BuildingList from './components/BuildingList'
 import BuildingDetail from './components/BuildingDetail'
 import ProjectView from './components/ProjectView'
 import CountrySelector from './components/CountrySelector'
+import ResourcePrices from './components/ResourcePrices'
 import { fetchCountries, createCountryAPI, deleteCountryAPI, fetchCountryPrices, updateCountryPricesAPI } from './api'
 import './win95.css'
 
@@ -12,6 +13,7 @@ function App() {
   const [countries, setCountries] = useState([])
   const [selectedCountryId, setSelectedCountryId] = useState(null)
   const [countryPrices, setCountryPrices] = useState({})
+  const [showPricesPanel, setShowPricesPanel] = useState(false)
   const [showCountryCreateDialog, setShowCountryCreateDialog] = useState(false)
   const [showCountryDeleteDialog, setShowCountryDeleteDialog] = useState(false)
   const [newCountryName, setNewCountryName] = useState('')
@@ -185,6 +187,13 @@ function App() {
           onNewCountry={() => { setNewCountryName(''); setShowCountryCreateDialog(true) }}
           onDeleteCountry={() => setShowCountryDeleteDialog(true)}
         />
+        <div className="win95-taskbar-sep" />
+        <button
+          className={`win95-nav-btn${showPricesPanel ? ' active' : ''}`}
+          onClick={() => setShowPricesPanel(p => !p)}
+        >
+          Prices
+        </button>
       </div>
 
       {countryError && (
@@ -207,7 +216,6 @@ function App() {
             <ProjectView
               countryId={selectedCountryId}
               prices={effectivePrices}
-              onUpdatePrices={handleUpdateCountryPrices}
             />
           </div>
         } />
@@ -215,6 +223,24 @@ function App() {
 
       {renderCountryCreateDialog()}
       {renderCountryDeleteDialog()}
+
+      {showPricesPanel && (
+        <div className="win95-side-panel">
+          <div className="win95-titlebar">
+            <span>Resource Prices</span>
+            <div className="win95-titlebar-buttons">
+              <button className="win95-titlebar-btn" onClick={() => setShowPricesPanel(false)}>X</button>
+            </div>
+          </div>
+          <div className="win95-side-panel-body">
+            <ResourcePrices
+              countryId={selectedCountryId}
+              prices={effectivePrices}
+              onUpdatePrices={handleUpdateCountryPrices}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

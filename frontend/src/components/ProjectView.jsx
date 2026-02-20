@@ -6,9 +6,8 @@ import {
 } from '../projectStorage'
 import CostCalculator from './CostCalculator'
 import OperationCosts from './OperationCosts'
-import ResourcePrices from './ResourcePrices'
 
-function ProjectView({ countryId, prices = {}, onUpdatePrices }) {
+function ProjectView({ countryId, prices = {} }) {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [activeTab, setActiveTab] = useState('construction')
@@ -20,7 +19,6 @@ function ProjectView({ countryId, prices = {}, onUpdatePrices }) {
   const nameInputRef = useRef(null)
 
   const project = projects.find(p => p.id === selectedId) || null
-  const allCountryBuildings = projects.flatMap(p => p.buildings)
 
   const refresh = useCallback(async () => {
     try {
@@ -282,12 +280,6 @@ function ProjectView({ countryId, prices = {}, onUpdatePrices }) {
         >
           Operation Costs
         </button>
-        <button
-          className={`win95-tab${activeTab === 'prices' ? ' active' : ''}`}
-          onClick={() => setActiveTab('prices')}
-        >
-          Resource Prices
-        </button>
       </div>
 
       <div style={{ padding: 4 }}>
@@ -304,13 +296,6 @@ function ProjectView({ countryId, prices = {}, onUpdatePrices }) {
           <OperationCosts
             projectBuildings={project?.buildings || []}
             prices={prices}
-          />
-        )}
-        {activeTab === 'prices' && (
-          <ResourcePrices
-            projectBuildings={allCountryBuildings}
-            prices={prices}
-            onUpdatePrices={onUpdatePrices}
           />
         )}
       </div>

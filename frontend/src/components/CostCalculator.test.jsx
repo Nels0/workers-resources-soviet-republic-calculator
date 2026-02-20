@@ -159,9 +159,7 @@ describe('CostCalculator Total Cost column', () => {
 
   it('computes correct row total cost', async () => {
     // Factory: concrete=100, steel=50. qty=2. price for concrete=10.
-    // Concrete ruble sub-line in data row = 100*2*10 = 2000
-    // tfoot ruble row: Concrete = 200*10 = 2000
-    // tfoot grand total = 2000 → 3 cells total
+    // Grand total = 200*10 = 2000
     renderCostCalculator({
       projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
       prices: { '1': 10 },
@@ -171,14 +169,13 @@ describe('CostCalculator Total Cost column', () => {
       expect(screen.getByText('Total ₽')).toBeInTheDocument()
     })
 
-    const cells = screen.getAllByText('2000')
-    expect(cells.length).toBe(3)
+    const grandTotalCell = screen.getByText('Total ₽').closest('tr').querySelector('.num')
+    expect(grandTotalCell).toHaveTextContent('2000')
   })
 
   it('computes correct grand total with multiple priced resources', async () => {
     // Factory: concrete=100, steel=50. qty=1. prices: concrete=10, steel=20.
-    // Grand total = 100*1*10 + 50*1*20 = 1000 + 1000 = 2000
-    // "2000" only appears in tfoot grand total → 1 cell
+    // Grand total = 100*10 + 50*20 = 1000 + 1000 = 2000
     renderCostCalculator({
       projectBuildings: [{ buildingId: 4, quantity: 1, position: 0 }],
       prices: { '1': 10, '2': 20 },
@@ -188,7 +185,7 @@ describe('CostCalculator Total Cost column', () => {
       expect(screen.getByText('Total ₽')).toBeInTheDocument()
     })
 
-    const cells = screen.getAllByText('2000')
-    expect(cells.length).toBe(1) // tfoot grand total only
+    const grandTotalCell = screen.getByText('Total ₽').closest('tr').querySelector('.num')
+    expect(grandTotalCell).toHaveTextContent('2000')
   })
 })

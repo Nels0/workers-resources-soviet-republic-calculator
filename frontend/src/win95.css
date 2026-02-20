@@ -465,6 +465,30 @@ body {
   font-size: calc(var(--win95-base-size) * 0.85);
 }
 
+/* Side panel (fixed right-side window) */
+
+.win95-side-panel {
+  position: fixed;
+  top: 36px;
+  right: 0;
+  bottom: 0;
+  width: 560px;
+  z-index: 100;
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-shadow);
+  border-bottom: 2px solid var(--win95-dark);
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.win95-side-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
 /* Dialog overlay + window */
 
 .win95-dialog-overlay {

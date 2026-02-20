@@ -7,7 +7,12 @@ const mockApi = vi.hoisted(() => ({
   fetchBuildingsList: vi.fn(),
 }))
 
+const mockStorage = vi.hoisted(() => ({
+  loadProjects: vi.fn(),
+}))
+
 vi.mock('../api', () => mockApi)
+vi.mock('../projectStorage', () => mockStorage)
 
 const RESOURCES = [
   { id: 1, name: 'Concrete', type: 'material', unit: 't' },
@@ -23,9 +28,13 @@ const BUILDINGS = [
   },
 ]
 
+const PROJECTS = [
+  { id: 'p1', name: 'Test', buildings: [{ buildingId: 10, quantity: 1, position: 0 }], country_id: 'c1' },
+]
+
 function renderResourcePrices(props = {}) {
   const defaults = {
-    projectBuildings: [{ buildingId: 10, quantity: 1, position: 0 }],
+    countryId: 'c1',
     prices: {},
     onUpdatePrices: vi.fn(),
   }
@@ -39,6 +48,7 @@ describe('ResourcePrices', () => {
       resources: RESOURCES,
       buildings: BUILDINGS,
     })
+    mockStorage.loadProjects.mockResolvedValue(PROJECTS)
   })
 
   it('renders used resources from both construction and operation', async () => {
@@ -59,37 +69,23 @@ describe('ResourcePrices', () => {
     })
 
     const inputs = screen.getAllByRole('spinbutton')
-    const concreteInput = inputs[0]
-    expect(concreteInput.value).toBe('10.5')
+    expect(inputs[0].value).toBe('10.5')
   })
 
-  it('Save button is disabled when no changes', async () => {
-    renderResourcePrices({ prices: {} })
+  it('shows empty state when no projects have buildings', async () => {
+    mockStorage.loadProjects.mockResolvedValue([
+      { id: 'p1', name: 'Empty', buildings: [], country_id: 'c1' },
+    ])
+    renderResourcePrices()
 
     await waitFor(() => {
-      expect(screen.getByText('Save Prices')).toBeInTheDocument()
+      expect(screen.getByText(/No buildings in any projects yet/)).toBeInTheDocument()
     })
-
-    expect(screen.getByText('Save Prices')).toBeDisabled()
   })
 
-  it('Save button enables after editing a price', async () => {
-    const user = userEvent.setup()
-    renderResourcePrices({ prices: {} })
-
-    await waitFor(() => {
-      expect(screen.getByText('Concrete')).toBeInTheDocument()
-    })
-
-    const inputs = screen.getAllByRole('spinbutton')
-    await user.type(inputs[0], '15')
-
-    expect(screen.getByText('Save Prices')).toBeEnabled()
-  })
-
-  it('calls onUpdatePrices with cleaned prices on Save', async () => {
+  it('auto-saves after typing with debounce', async () => {
     const onUpdatePrices = vi.fn()
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     renderResourcePrices({ prices: {}, onUpdatePrices })
 
     await waitFor(() => {
@@ -98,16 +94,28 @@ describe('ResourcePrices', () => {
 
     const inputs = screen.getAllByRole('spinbutton')
     await user.type(inputs[0], '15')
-    await user.click(screen.getByText('Save Prices'))
 
-    expect(onUpdatePrices).toHaveBeenCalledWith({ '1': 15 })
+    // Not called immediately — debounce is pending
+    expect(onUpdatePrices).not.toHaveBeenCalled()
+
+    // Wait up to 2s for the 600ms debounce to fire
+    await waitFor(() => {
+      expect(onUpdatePrices).toHaveBeenCalledWith({ '1': 15 })
+    }, { timeout: 2000 })
   })
 
-  it('shows empty state when no buildings in project', async () => {
-    renderResourcePrices({ projectBuildings: [] })
+  it('does not auto-save immediately after typing', async () => {
+    const onUpdatePrices = vi.fn()
+    const user = userEvent.setup({ delay: null })
+    renderResourcePrices({ prices: {}, onUpdatePrices })
 
     await waitFor(() => {
-      expect(screen.getByText(/No buildings in project/)).toBeInTheDocument()
+      expect(screen.getByText('Concrete')).toBeInTheDocument()
     })
+
+    const inputs = screen.getAllByRole('spinbutton')
+    await user.type(inputs[0], '5')
+
+    expect(onUpdatePrices).not.toHaveBeenCalled()
   })
 })

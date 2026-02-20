@@ -30,9 +30,10 @@ cd backend && uv run pytest         # Backend tests
 ## Conventions
 
 ### UI / CSS
-- Win95-styled classes from `src/win95.css` (`.win95-window`, `.win95-btn`, `.win95-input`, `.win95-table`, `.win95-tab`, `.win95-dialog`, etc.)
+- Win95-styled classes from `src/win95.css` (`.win95-window`, `.win95-btn`, `.win95-input`, `.win95-table`, `.win95-tab`, `.win95-dialog`, `.win95-side-panel`, etc.)
 - Raised/sunken 3D borders, gray backgrounds (#c0c0c0), blue title bars, inset panels
 - Win95-styled dialogs (`.win95-dialog-overlay` + `.win95-dialog`) — never browser `prompt()`/`confirm()`
+- Win95-styled side panel (`.win95-side-panel` + `.win95-side-panel-body`) — fixed right-side window with titlebar
 - Building names display `source_file` alongside (smaller, greyed out via `win95-muted`) to disambiguate duplicates
 - Never use Bootstrap or other CSS frameworks
 
@@ -67,7 +68,9 @@ cd backend && uv run pytest         # Backend tests
 - `position` field preserves order and serves as key for update/delete API calls
 - `GET /api/projects?country_id=<id>` — filter by country
 - Prices are per-country (shared across all projects in a country): `App.jsx` owns `countryPrices` state, fetches on country switch, passes to `ProjectView` as `prices` prop
-- ResourcePrices tab shows buildings from ALL projects in the country (`allCountryBuildings`)
+- Resource Prices live in a **taskbar-toggled side panel** (Prices button, right of CountrySelector); accessible from any page
+- `ResourcePrices` component accepts `countryId` + `prices` + `onUpdatePrices`; fetches its own project data via `loadProjects(countryId)` to derive used resources; auto-saves with 600ms debounce (no Save button)
+- Resource name shown as `Name (unit)` — no separate Unit column
 - CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
 
 ### Testing
@@ -75,6 +78,7 @@ cd backend && uv run pytest         # Backend tests
 - **Frontend browser:** Vitest browser mode + Playwright + Firefox. Loads `win95.css`, disables auto-cleanup (`RTL_SKIP_AUTO_CLEANUP`), 2s delay between tests for visual inspection. Setup: `src/browser-test-setup.js`
 - **Backend:** pytest with in-memory SQLite. Tests: `backend/tests/`
 - Test cleanup is handled by setup files (`test-setup.js` / `browser-test-setup.js`), not in test files
+- For debounce testing: use real timers with `userEvent.setup({ delay: null })` + `waitFor(..., { timeout: 2000 })` — avoid `vi.useFakeTimers()` before render as it blocks `waitFor` polling
 
 ## Architecture
 
@@ -82,7 +86,8 @@ cd backend && uv run pytest         # Backend tests
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
   - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
-- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs / Resource Prices
+- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs
+- **Resource Prices** panel: toggled by "Prices" button in taskbar; fixed right-side panel (`win95-side-panel`), available on all pages
 
 ### Data Models
 - `Building` → `BuildingCost` (phase: construction/operation) + `BuildingFlow` (direction: produces/consumes)

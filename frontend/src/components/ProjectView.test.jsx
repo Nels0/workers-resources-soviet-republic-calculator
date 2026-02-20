@@ -11,9 +11,6 @@ vi.mock('./CostCalculator', () => ({
 vi.mock('./OperationCosts', () => ({
   default: () => <div data-testid="operation-costs" />
 }))
-vi.mock('./ResourcePrices', () => ({
-  default: () => <div data-testid="resource-prices" />
-}))
 
 // Mock projectStorage
 const mockStorage = vi.hoisted(() => ({
@@ -33,7 +30,6 @@ function renderProjectView(props = {}) {
   const defaults = {
     countryId: 'c1',
     prices: {},
-    onUpdatePrices: vi.fn(),
   }
   return render(
     <MemoryRouter>
@@ -232,27 +228,3 @@ describe('ProjectView create project', () => {
   })
 })
 
-describe('ProjectView Resource Prices tab', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockStorage.migrateFromLocalStorage.mockResolvedValue(false)
-  })
-
-  it('renders Resource Prices tab and shows ResourcePrices component when clicked', async () => {
-    const project = { id: 'p1', name: 'Test', buildings: [], country_id: 'c1' }
-    mockStorage.loadProjects.mockResolvedValue([project])
-    const user = userEvent.setup()
-
-    renderProjectView({ prices: { '1': 10.0 }, countryId: 'c1' })
-
-    await waitFor(() => {
-      expect(screen.getByText('Resource Prices')).toBeInTheDocument()
-    })
-
-    await user.click(screen.getByText('Resource Prices'))
-
-    expect(screen.getByTestId('resource-prices')).toBeInTheDocument()
-    expect(screen.queryByTestId('cost-calculator')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('operation-costs')).not.toBeInTheDocument()
-  })
-})

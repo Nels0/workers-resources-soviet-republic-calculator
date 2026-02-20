@@ -6,8 +6,9 @@ import { playwright } from '@vitest/browser-playwright'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '127.0.0.1',
     proxy: {
-      '/api': 'http://localhost:5000',
+      '/api': 'http://127.0.0.1:5000',
     },
   },
   test: {

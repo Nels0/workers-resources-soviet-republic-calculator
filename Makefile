@@ -7,16 +7,13 @@ frontend:
 	cd frontend && npm run dev
 
 dev:
-	@trap 'kill 0' EXIT; \
-	$(MAKE) backend & \
-	$(MAKE) frontend & \
-	wait
+	unshare --user --net -- bash -c "ip link set lo up 2>/dev/null; trap 'kill 0' EXIT; $(MAKE) backend & $(MAKE) frontend & wait"
 
 import:
-	cd backend && uv run python -m extractor.importer $(ARGS)
+	unshare --user --net -- bash -c "cd backend && uv run python -m extractor.importer $(ARGS)"
 
 reimport:
-	cd backend && uv run python -m extractor.importer --game-dir /run/media/nelson/Storage/SteamLibrary/steamapps/common/SovietRepublic/
+	unshare --user --net -- bash -c "cd backend && uv run python -m extractor.importer --game-dir /run/media/nelson/Storage/SteamLibrary/steamapps/common/SovietRepublic/"
 
 migrate:
 	uv run python backend/migrate_add_countries.py

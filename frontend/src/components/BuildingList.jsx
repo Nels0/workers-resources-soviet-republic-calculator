@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchBuildingsList } from '../api'
+import BuildingConstructionTable from './BuildingConstructionTable'
 import '../win95.css'
 
 function BuildingList() {
@@ -195,30 +196,13 @@ function BuildingList() {
       return <div className="win95-statusbar">No buildings match filters.</div>
     }
     return (
-      <table className="win95-table">
-        <thead>
-          <tr>
-            {renderSortHeader('name', 'Name')}
-            {renderSortHeader('category', 'Category')}
-            {activeColumns.map(r =>
-              renderSortHeader(`res_${r.id}`, `${r.name} (${r.unit})`)
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(b => (
-            <tr key={b.id}>
-              {renderNameCell(b)}
-              <td>{b.category}</td>
-              {activeColumns.map(r => (
-                <td key={r.id} className="num">
-                  {b.resource_costs[String(r.id)] || ''}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <BuildingConstructionTable
+        buildings={sorted}
+        resources={resources}
+        sortKey={sortKey}
+        sortAsc={sortAsc}
+        onSort={handleSort}
+      />
     )
   }
 

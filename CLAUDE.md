@@ -120,37 +120,50 @@ cd backend && uv run pytest         # Backend tests
 
 ### Countries
 - `Country` model: `{ id (UUID), name, created_at }` — top-level container for projects + prices
-- `CountryResourcePrice`: `{ country_id, resource_id, price }` UNIQUE(country_id, resource_id)
+- `CountryResourcePrice`: `{ country_id, resource_id, import_price, export_price }` UNIQUE(country_id, resource_id)
 - Country selector in taskbar (persistent global context); auto-selects first country on load
 - Country delete blocked if it has any projects (returns 409); cascade deletes prices
-- `GET/PUT /api/countries/<id>/prices` — bulk-replace, zero/null discarded
-- Migration: `backend/migrate_add_countries.py` — run once with `make migrate`
+- `GET/PUT /api/countries/<id>/prices` — bulk-replace; format `{rid: {import: price, export: price}}`; entries where both are 0/null discarded
+- Migrations: `migrate_add_countries.py`, `migrate_add_import_export_prices.py` — run via `make migrate`
 
 ### Projects
 - Stored in backend SQLite (`Project` + `ProjectBuilding` models)
 - `Project` now has nullable `country_id` FK; no longer has per-project prices
+- `Project.productivity` (float, default 1.0) — project-wide productivity factor for Operation tab
+- `ProjectBuilding.productivity` (float, nullable) — per-building override; null means use project default
 - `frontend/src/projectStorage.js` — async wrappers; `loadProjects(countryId)`, `createProject(name, countryId)`
-- Shape: `{ id, name, country_id, buildings: [{ buildingId, quantity, position }] }`
+- Shape: `{ id, name, country_id, productivity, buildings: [{ buildingId, quantity, position, productivity }] }`
 - `position` field preserves order and serves as key for update/delete API calls
+- `PUT /api/projects/<id>` accepts `{ name?, productivity? }` — either field optional, but at least one required
+- `PUT /api/projects/<id>/buildings/<pos>` accepts `{ quantity?, productivity? }` — either optional; productivity=null clears override
+- Migration: `migrate_add_productivity.py` — adds `productivity` columns, run via `make migrate`
 - `GET /api/projects?country_id=<id>` — filter by country
 - Prices are per-country (shared across all projects in a country): `App.jsx` owns `countryPrices` state, fetches on country switch, passes to `ProjectView` as `prices` prop
+- Prices are split into **import price** (cost to bring in a deficit) and **export price** (revenue from a surplus); `countryPrices` shape: `{ rid: { import: price, export: price } }`
 - Resource Prices live in a **taskbar-toggled side panel** (Prices button, right of CountrySelector); accessible from any page
-- `ResourcePrices` component accepts `countryId` + `prices` + `onUpdatePrices`; fetches its own project data via `loadProjects(countryId)` to derive used resources; auto-saves with 600ms debounce (no Save button)
-- Resource name shown as `Name (unit)` — no separate Unit column
-- CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
+- `ResourcePrices` accepts `countryId` + `prices` + `onUpdatePrices`; derives used resources from all cost/flow fields (`resource_costs`, `operation_costs`, `produces`, `consumes`); two price inputs per row (Import ₽ / Export ₽); auto-saves with 600ms debounce
+- `CostCalculator` uses `prices[rid]?.import` (construction materials are imports); single column per resource: unit amount + navy ruble sub-line. Footer: unit totals row, ₽ totals row, grand total row
+- `IncomeAnalysis` ruble calculations: net > 0 → use export price; net < 0 → use import price
 - `BuildingSearch` (in `CostCalculator.jsx`): always-visible `.win95-search-results` panel (200px) above the project table; shows first 10 matches as a `BuildingConstructionTable`; arrow keys navigate, Enter adds, Tab completes next word of highlighted result's name
 
 ### Income Analysis (`components/IncomeAnalysis.jsx`)
-- Props: `{ projectId, projectBuildings, prices }` — fetches its own buildings/resources from API
-- **Period selector**: toolbar row above both sections (Day / Week / Month / Year, default Month); affects all flow values and unit labels throughout. Raw `.ini` values are per-game-day; conversion: `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant holds `materialFactor`, `elecFactor`, `suffix` per period. Resources with `unit === 'MW'` use `elecFactor`; all others use `materialFactor`.
-- **Section 1 — Resource Income table**: sparse columns per resource (produces or consumes); net flow per cell = `(produced − consumed) × qty × periodMultiplier`; column headers show `periodUnit` (e.g. `t/mo`, `MWh/mo`); positive black `↑`, negative red `↓`; ₽ Net column when any price is set; partial-price indicator `(+?)` with tooltip when some resources unpriced; footer Net row; omitted-buildings statusbar note when buildings have no flows
+- Props: `{ projectId, projectBuildings, prices, defaultProductivity }` — fetches its own buildings/resources from API
+- **Toolbar**: Period buttons (Day/Week/Month/Year) | `Productivity: [N]%` number input | `☐ Normalize/worker` checkbox
+- **Productivity factor**: `projectProductivity` (float, init from `defaultProductivity` prop on project switch); debounced 600ms save via `updateProjectAPI`; per-building `buildingProductivityOverrides` map (init from `pb.productivity` on project switch), debounced via `updateBuildingProductivityAPI`
+- **`ProductivitySlider`** (module-level component): 10 navy/gray blocks, Win95 inset container, click-and-drag, snaps to 10% increments (0–100%); shows `%` label (navy+bold if overridden, muted if default); `×` clear button when overridden. Used in building name cell of all income tables.
+- **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed` (buildings with 0 workers unaffected); column headers show `/worker/` infix (e.g. `t/worker/mo`)
+- **`getNetFlow(b, pb, r, { applyProductivity, applyNormalize })`**: opts control scaling; productivity factor = `buildingProductivityOverrides[pb.position] ?? projectProductivity`
+- **Period selector**: Raw `.ini` values are per-game-day; `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant holds `materialFactor`, `elecFactor`, `suffix` per period.
+- **Section 1 — Resource Income table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `ProductivitySlider` in name cell; column headers show `periodUnit` with normalize infix
 - **Section 2 — Chain Builder**: groups buildings by shared resource relationships
   - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
   - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure
-  - Each chain: inline rename input (blur/Enter to commit), ▲/▼ reorder buttons (swap `position` values), `Dissolve` button; mini income table with move dropdown per row; status line summarising net flows + ₽
+  - Each chain: inline rename, `☐ Prod.` + `☐ Norm.` checkboxes (control chain economics only, persisted in `localStorage` `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building income table (with `ProductivitySlider`) + chain economics panel
+  - Chain economics panel: Produced / Consumed / Net table with per-resource ☐ inclusion checkboxes (persisted in `localStorage` `chain-include-${projectId}`); statusbar Import/Export/Net ₽
   - Move dropdown excludes the building's own current chain from options
-  - Ungrouped groupbox shows buildings not in any chain; move dropdowns appear only when chains exist
+  - Ungrouped groupbox shows buildings not in any chain; `ProductivitySlider` shown there too
   - Deleting a building from the project (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)
+- **Persistence**: project productivity → DB; per-building productivity overrides → DB; normalize view → localStorage; chain Prod./Norm. checkboxes → localStorage; chain inclusion checkboxes → localStorage
 
 ### Project Chains
 - `ProjectChain`: `{ id (UUID), project_id, name, position }` — display order within a project

@@ -22,3 +22,4 @@ migrate:
 	uv run python backend/migrate_add_countries.py
 	uv run python backend/migrate_add_chains.py
 	uv run python backend/migrate_add_import_export_prices.py
+	uv run python backend/migrate_add_productivity.py

@@ -58,15 +58,20 @@ def get_project(project_id):
 @bp.route("/api/projects/<project_id>", methods=["PUT"])
 def update_project(project_id):
     data = request.get_json()
-    if not data or not data.get("name", "").strip():
-        return jsonify({"error": "Name is required"}), 400
+    if not data or ("name" not in data and "productivity" not in data):
+        return jsonify({"error": "name or productivity is required"}), 400
+    if "name" in data and not data["name"].strip():
+        return jsonify({"error": "Name cannot be empty"}), 400
 
     session = get_session()
     try:
         project = session.get(Project, project_id)
         if not project:
             return jsonify({"error": "Project not found"}), 404
-        project.name = data["name"].strip()
+        if "name" in data:
+            project.name = data["name"].strip()
+        if "productivity" in data:
+            project.productivity = float(data["productivity"])
         session.commit()
         return jsonify(project.to_dict())
     finally:
@@ -116,8 +121,8 @@ def add_building(project_id):
 @bp.route("/api/projects/<project_id>/buildings/<int:pos>", methods=["PUT"])
 def update_building(project_id, pos):
     data = request.get_json()
-    if not data or "quantity" not in data:
-        return jsonify({"error": "quantity is required"}), 400
+    if not data or ("quantity" not in data and "productivity" not in data):
+        return jsonify({"error": "quantity or productivity is required"}), 400
 
     session = get_session()
     try:
@@ -129,7 +134,10 @@ def update_building(project_id, pos):
         if not pb:
             return jsonify({"error": "Building not found at position"}), 404
 
-        pb.quantity = data["quantity"]
+        if "quantity" in data:
+            pb.quantity = data["quantity"]
+        if "productivity" in data:
+            pb.productivity = data["productivity"]  # None clears override
         session.commit()
         return jsonify(project.to_dict())
     finally:

@@ -131,6 +131,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     country_id: Mapped[str | None] = mapped_column(ForeignKey("countries.id"), nullable=True, default=None)
+    productivity: Mapped[float] = mapped_column(Float, default=1.0)
 
     buildings: Mapped[list["ProjectBuilding"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="ProjectBuilding.position"
@@ -142,8 +143,14 @@ class Project(Base):
             "id": self.id,
             "name": self.name,
             "country_id": self.country_id,
+            "productivity": self.productivity if self.productivity is not None else 1.0,
             "buildings": [
-                {"buildingId": pb.building_id, "quantity": pb.quantity, "position": pb.position}
+                {
+                    "buildingId": pb.building_id,
+                    "quantity": pb.quantity,
+                    "position": pb.position,
+                    "productivity": pb.productivity,
+                }
                 for pb in self.buildings
             ],
         }
@@ -157,6 +164,7 @@ class ProjectBuilding(Base):
     building_id: Mapped[int] = mapped_column(ForeignKey("buildings.id"))
     quantity: Mapped[int] = mapped_column(default=1)
     position: Mapped[int] = mapped_column(default=0)
+    productivity: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     project: Mapped["Project"] = relationship(back_populates="buildings")
 

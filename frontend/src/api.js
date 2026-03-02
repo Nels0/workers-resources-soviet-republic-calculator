@@ -108,6 +108,22 @@ export function updateBuildingQtyAPI(projectId, pos, quantity) {
   });
 }
 
+export function updateBuildingProductivityAPI(projectId, pos, productivity) {
+  return fetchJSON(`/projects/${projectId}/buildings/${pos}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productivity }),
+  });
+}
+
+export function updateProjectAPI(projectId, updates) {
+  return fetchJSON(`/projects/${projectId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+}
+
 export function importProjectsAPI(projects) {
   return fetchJSON('/projects/import', {
     method: 'POST',

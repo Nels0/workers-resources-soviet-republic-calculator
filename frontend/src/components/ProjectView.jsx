@@ -298,6 +298,7 @@ function ProjectView({ countryId, prices = {} }) {
             projectId={project?.id}
             projectBuildings={project?.buildings || []}
             prices={prices}
+            defaultProductivity={project?.productivity ?? 1.0}
           />
         )}
       </div>

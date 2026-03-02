@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   fetchBuildingsList,
@@ -8,7 +8,94 @@ import {
   deleteProjectChainAPI,
   updateChainMembersAPI,
   createProjectChainAPI,
+  updateProjectAPI,
+  updateBuildingProductivityAPI,
 } from '../api'
+
+// Win95-styled 10-block productivity slider (0–100%, snap to 10%)
+function ProductivitySlider({ value, onChange, hasOverride, onClear }) {
+  const containerRef = useRef(null)
+  const isDragging = useRef(false)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange })
+
+  useEffect(() => {
+    function getVal(clientX) {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return 0
+      const fraction = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width))
+      return Math.round(fraction * 10) / 10
+    }
+    function onMove(e) {
+      if (!isDragging.current) return
+      onChangeRef.current(getVal(e.clientX))
+    }
+    function onUp() { isDragging.current = false }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  function handleMouseDown(e) {
+    isDragging.current = true
+    const rect = containerRef.current.getBoundingClientRect()
+    const fraction = Math.max(0, Math.min(0.999, (e.clientX - rect.left) / rect.width))
+    onChangeRef.current(Math.round(fraction * 10) / 10)
+    e.preventDefault()
+  }
+
+  const filledBlocks = Math.round(value * 10)
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <div
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        title={`Productivity: ${Math.round(value * 100)}% — drag to adjust`}
+        style={{
+          display: 'flex',
+          gap: 1,
+          padding: 2,
+          cursor: 'ew-resize',
+          userSelect: 'none',
+          boxShadow: 'inset 1px 1px #808080, inset -1px -1px #ffffff',
+          background: '#ffffff',
+        }}
+      >
+        {Array.from({ length: 10 }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 11,
+              height: 11,
+              background: i < filledBlocks ? '#000080' : '#c0c0c0',
+              flexShrink: 0,
+            }}
+          />
+        ))}
+      </div>
+      <span style={{
+        fontSize: '0.8em',
+        minWidth: 26,
+        color: hasOverride ? '#000080' : '#808080',
+        fontWeight: hasOverride ? 'bold' : undefined,
+      }}>
+        {Math.round(value * 100)}%
+      </span>
+      {hasOverride && (
+        <button
+          className="win95-btn"
+          style={{ fontSize: '0.75em', padding: '0 3px' }}
+          onClick={onClear}
+          title="Clear override — revert to project default"
+        >×</button>
+      )}
+    </div>
+  )
+}
 
 const PERIODS = {
   day:   { label: 'Day',   suffix: '/day', materialFactor: 5,                   elecFactor: 24 },
@@ -17,7 +104,7 @@ const PERIODS = {
   year:  { label: 'Year',  suffix: '/yr',  materialFactor: 5 * 365.2425,        elecFactor: 24 * 365.2425 },
 }
 
-function IncomeAnalysis({ projectId, projectBuildings, prices }) {
+function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivity = 1.0 }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [chains, setChains] = useState([])
@@ -28,6 +115,13 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   const [showAutoDetectConfirm, setShowAutoDetectConfirm] = useState(false)
   const [period, setPeriod] = useState('month')
   const [included, setIncluded] = useState({})
+  const [projectProductivity, setProjectProductivity] = useState(defaultProductivity)
+  const [buildingProductivityOverrides, setBuildingProductivityOverrides] = useState({})
+  const [normalizeView, setNormalizeView] = useState(false)
+  const [chainFactors, setChainFactors] = useState({})
+
+  const projectProdDebounceRef = useRef(null)
+  const buildingProdDebounceRef = useRef({})
 
   useEffect(() => {
     fetchBuildingsList()
@@ -51,15 +145,34 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
       .finally(() => setLoadingChains(false))
   }, [projectId])
 
-  // Load per-resource inclusion state from localStorage when project changes
+  // Initialize project-level state from props/localStorage when project changes
   useEffect(() => {
     if (!projectId) return
+    setProjectProductivity(defaultProductivity ?? 1.0)
+
+    const overrides = {}
+    for (const pb of projectBuildings) {
+      if (pb.productivity != null) overrides[pb.position] = pb.productivity
+    }
+    setBuildingProductivityOverrides(overrides)
+
+    const storedNorm = localStorage.getItem(`normalize-view-${projectId}`)
+    setNormalizeView(storedNorm === 'true')
+
+    try {
+      const storedFactors = JSON.parse(localStorage.getItem(`chain-factors-${projectId}`))
+      setChainFactors(storedFactors || {})
+    } catch {
+      setChainFactors({})
+    }
+
     try {
       const stored = JSON.parse(localStorage.getItem(`chain-include-${projectId}`))
       setIncluded(stored || {})
     } catch {
       setIncluded({})
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
   const buildingMap = useMemo(() => {
@@ -130,6 +243,23 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     })
   }
 
+  // --- Chain factor helpers ---
+
+  function getChainFactors(chainId) {
+    return chainFactors[chainId] ?? { productivity: true, normalize: true }
+  }
+
+  function setChainFactor(chainId, key, value) {
+    setChainFactors(prev => {
+      const current = prev[chainId] ?? { productivity: true, normalize: true }
+      const updated = { ...prev, [chainId]: { ...current, [key]: value } }
+      if (projectId) {
+        localStorage.setItem(`chain-factors-${projectId}`, JSON.stringify(updated))
+      }
+      return updated
+    })
+  }
+
   // --- Period helpers ---
 
   function periodMultiplier(r) {
@@ -137,21 +267,32 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     return r.unit === 'MW' ? p.elecFactor : p.materialFactor
   }
 
-  function periodUnit(unit) {
+  function periodUnit(unit, normalize = false) {
     const suffix = PERIODS[period].suffix
-    return unit === 'MW' ? 'MWh' + suffix : unit + suffix
+    const workerPart = normalize ? '/worker' : ''
+    return unit === 'MW' ? 'MWh' + workerPart + suffix : unit + workerPart + suffix
   }
 
-  function getNetFlow(b, pb, r) {
+  function getNetFlow(b, pb, r, { applyProductivity = true, applyNormalize = false } = {}) {
     const raw = ((b.produces?.[String(r.id)] || 0) - (b.consumes?.[String(r.id)] || 0)) * pb.quantity
-    return raw * periodMultiplier(r)
+    let value = raw * periodMultiplier(r)
+    if (applyProductivity) {
+      const factor = buildingProductivityOverrides[pb.position] != null
+        ? buildingProductivityOverrides[pb.position]
+        : projectProductivity
+      value *= factor
+    }
+    if (applyNormalize && b.workers_needed > 0) {
+      value /= b.workers_needed
+    }
+    return value
   }
 
-  function computeRubleNet(b, pb, activeResources) {
+  function computeRubleNet(b, pb, activeResources, flowOpts = {}) {
     let value = 0
     let hasUnpriced = false
     for (const r of activeResources) {
-      const net = getNetFlow(b, pb, r)
+      const net = getNetFlow(b, pb, r, flowOpts)
       if (net === 0) continue
       const price = net > 0 ? exportPrice(r) : importPrice(r)
       if (price > 0) value += net * price
@@ -193,8 +334,48 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     return flowResourceList.filter(r => ids.has(String(r.id)))
   }
 
+  // --- Productivity handlers ---
+
+  function handleProjectProductivityChange(val) {
+    const pct = parseInt(val, 10)
+    if (isNaN(pct)) return
+    const factor = Math.max(0, Math.min(200, pct)) / 100
+    setProjectProductivity(factor)
+    if (projectProdDebounceRef.current) clearTimeout(projectProdDebounceRef.current)
+    projectProdDebounceRef.current = setTimeout(() => {
+      if (projectId) updateProjectAPI(projectId, { productivity: factor }).catch(console.error)
+    }, 600)
+  }
+
+  function handleNormalizeChange(checked) {
+    setNormalizeView(checked)
+    if (projectId) localStorage.setItem(`normalize-view-${projectId}`, String(checked))
+  }
+
+  function handleBuildingProductivityChange(pos, val) {
+    // Accepts either a 0–1 float or a percent string
+    const factor = typeof val === 'number'
+      ? Math.max(0, Math.min(1, val))
+      : Math.max(0, Math.min(200, parseInt(val, 10) || 0)) / 100
+    setBuildingProductivityOverrides(prev => ({ ...prev, [pos]: factor }))
+    if (buildingProdDebounceRef.current[pos]) clearTimeout(buildingProdDebounceRef.current[pos])
+    buildingProdDebounceRef.current[pos] = setTimeout(() => {
+      if (projectId) updateBuildingProductivityAPI(projectId, pos, factor).catch(console.error)
+    }, 600)
+  }
+
+  function handleBuildingProductivityClear(pos) {
+    setBuildingProductivityOverrides(prev => {
+      const updated = { ...prev }
+      delete updated[pos]
+      return updated
+    })
+    if (buildingProdDebounceRef.current[pos]) clearTimeout(buildingProdDebounceRef.current[pos])
+    if (projectId) updateBuildingProductivityAPI(projectId, pos, null).catch(console.error)
+  }
+
   // Render the income table for a set of project buildings
-  function renderIncomeTable(pbs, { showMove = false } = {}) {
+  function renderIncomeTable(pbs, { showMove = false, showProductivityOverride = false, flowOpts = {} } = {}) {
     const activePbs = pbs.filter(pb => {
       const b = buildingMap[pb.buildingId]
       if (!b) return false
@@ -214,7 +395,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     for (const r of activeResources) {
       totals[r.id] = activePbs.reduce((sum, pb) => {
         const b = buildingMap[pb.buildingId]
-        return b ? sum + getNetFlow(b, pb, r) : sum
+        return b ? sum + getNetFlow(b, pb, r, flowOpts) : sum
       }, 0)
     }
 
@@ -229,6 +410,8 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
       else totalHasUnpriced = true
     }
 
+    const normalize = flowOpts.applyNormalize || false
+
     return (
       <div className="win95-inset win95-table-wrap">
         <table className="win95-table win95-table-static">
@@ -236,7 +419,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             <tr>
               <th style={{ width: '100%', textAlign: 'left' }}>Building</th>
               <th>Qty</th>
-              {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r.unit)})</th>)}
+              {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r.unit, normalize)})</th>)}
               {hasAnyPrice && <th>₽ Net</th>}
               {showMove && <th></th>}
             </tr>
@@ -245,16 +428,27 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             {activePbs.map((pb, i) => {
               const b = buildingMap[pb.buildingId]
               if (!b) return null
-              const { value: rubles, hasUnpriced } = computeRubleNet(b, pb, activeResources)
+              const { value: rubles, hasUnpriced } = computeRubleNet(b, pb, activeResources, flowOpts)
+              const hasOverride = buildingProductivityOverrides[pb.position] != null
               return (
                 <tr key={i}>
                   <td>
                     <Link to={`/buildings/${b.id}`}>{b.name}</Link>
                     {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
+                    {showProductivityOverride && (
+                      <div style={{ marginTop: 2 }}>
+                        <ProductivitySlider
+                          value={Math.min(1, buildingProductivityOverrides[pb.position] ?? projectProductivity)}
+                          onChange={factor => handleBuildingProductivityChange(pb.position, factor)}
+                          hasOverride={hasOverride}
+                          onClear={() => handleBuildingProductivityClear(pb.position)}
+                        />
+                      </div>
+                    )}
                   </td>
                   <td className="num">{pb.quantity}</td>
                   {activeResources.map(r => (
-                    <td key={r.id} className="num">{renderNetCell(getNetFlow(b, pb, r))}</td>
+                    <td key={r.id} className="num">{renderNetCell(getNetFlow(b, pb, r, flowOpts))}</td>
                   ))}
                   {hasAnyPrice && (
                     <td className="num">{renderRubleCell(rubles, hasUnpriced)}</td>
@@ -321,7 +515,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   }
 
   // Compute per-resource produced/consumed/net for a set of project buildings
-  function computeChainEconomics(pbs) {
+  function computeChainEconomics(pbs, opts = { applyProductivity: true, applyNormalize: false }) {
     const activePbs = pbs.filter(pb => buildingMap[pb.buildingId])
     const activeResources = getActiveResources(activePbs)
 
@@ -337,10 +531,16 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     for (const pb of activePbs) {
       const b = buildingMap[pb.buildingId]
       if (!b) continue
+      const factor = opts.applyProductivity
+        ? (buildingProductivityOverrides[pb.position] != null
+            ? buildingProductivityOverrides[pb.position]
+            : projectProductivity)
+        : 1.0
+      const normFactor = (opts.applyNormalize && b.workers_needed > 0) ? b.workers_needed : 1.0
       for (const r of activeResources) {
         const mult = periodMultiplier(r)
-        produced[r.id] += (b.produces?.[String(r.id)] || 0) * pb.quantity * mult
-        consumed[r.id] += (b.consumes?.[String(r.id)] || 0) * pb.quantity * mult
+        produced[r.id] += (b.produces?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
+        consumed[r.id] += (b.consumes?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
       }
     }
 
@@ -368,15 +568,16 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     }
   }
 
-  function renderChainEconomics(pbs) {
+  function renderChainEconomics(pbs, opts = { applyProductivity: true, applyNormalize: false }) {
     const { activeResources, produced, consumed, net, importRubles, exportRubles, netRubles } =
-      computeChainEconomics(pbs)
+      computeChainEconomics(pbs, opts)
 
     const nonZero = activeResources.filter(r => produced[r.id] !== 0 || consumed[r.id] !== 0)
     if (nonZero.length === 0) return null
 
     const suffix = PERIODS[period].suffix
     const netRubleColor = netRubles > 0 ? '#000080' : netRubles < 0 ? '#c00000' : undefined
+    const normalize = opts.applyNormalize || false
 
     return (
       <div>
@@ -393,7 +594,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             </thead>
             <tbody>
               {nonZero.map(r => {
-                const pUnit = periodUnit(r.unit)
+                const pUnit = periodUnit(r.unit, normalize)
                 const n = net[r.id]
                 const netColor = n < 0 ? '#c00000' : undefined
                 const netLabel = n > 0 ? `+${Math.round(n * 100) / 100} ↑` :
@@ -647,6 +848,10 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
       .map(pos => projectBuildings.find(pb => pb.position === pos))
       .filter(Boolean)
 
+    const factors = getChainFactors(chain.id)
+    const ecoOpts = { applyProductivity: factors.productivity, applyNormalize: factors.normalize }
+    const flowOpts = { applyProductivity: true, applyNormalize: normalizeView }
+
     return (
       <div key={chain.id} className="win95-groupbox" style={{ marginBottom: 6 }}>
         <div className="win95-groupbox-title" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -658,6 +863,22 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             onBlur={() => handleChainNameCommit(chain.id)}
             onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
           />
+          <label style={{ fontSize: '0.8em', display: 'flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' }}>
+            <input
+              type="checkbox"
+              checked={factors.productivity}
+              onChange={e => setChainFactor(chain.id, 'productivity', e.target.checked)}
+            />
+            Prod.
+          </label>
+          <label style={{ fontSize: '0.8em', display: 'flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' }}>
+            <input
+              type="checkbox"
+              checked={factors.normalize}
+              onChange={e => setChainFactor(chain.id, 'normalize', e.target.checked)}
+            />
+            Norm.
+          </label>
           <button
             className="win95-btn"
             style={{ fontSize: '0.85em', padding: '1px 4px' }}
@@ -679,8 +900,8 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
           </button>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>{renderIncomeTable(chainPbs, { showMove: true })}</div>
-          <div style={{ flex: '0 0 auto' }}>{renderChainEconomics(chainPbs)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>{renderIncomeTable(chainPbs, { showMove: true, showProductivityOverride: true, flowOpts })}</div>
+          <div style={{ flex: '0 0 auto' }}>{renderChainEconomics(chainPbs, ecoOpts)}</div>
         </div>
       </div>
     )
@@ -718,6 +939,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   function renderChainBuilder() {
     const chainedPositions = getChainedPositions()
     const ungroupedPbs = projectBuildings.filter(pb => !chainedPositions.has(pb.position))
+    const flowOpts = { applyProductivity: true, applyNormalize: normalizeView }
 
     return (
       <div className="win95-groupbox" style={{ marginTop: 8 }}>
@@ -739,7 +961,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
         {ungroupedPbs.length > 0 && (
           <div className="win95-groupbox">
             <div className="win95-groupbox-title">Ungrouped</div>
-            {renderIncomeTable(ungroupedPbs, { showMove: chains.length > 0 })}
+            {renderIncomeTable(ungroupedPbs, { showMove: chains.length > 0, showProductivityOverride: true, flowOpts })}
           </div>
         )}
         {renderAutoDetectConfirmDialog()}
@@ -761,9 +983,11 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     return <div className="win95-statusbar">No production flows for the buildings in this project.</div>
   }
 
+  const section1FlowOpts = { applyProductivity: true, applyNormalize: normalizeView }
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: '0.85em' }}>Period:</span>
         {Object.entries(PERIODS).map(([key, p]) => (
           <button
@@ -777,10 +1001,31 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             onClick={() => setPeriod(key)}
           >{p.label}</button>
         ))}
+        <span style={{ margin: '0 2px', color: '#808080' }}>|</span>
+        <span style={{ fontSize: '0.85em' }}>Productivity:</span>
+        <input
+          type="number"
+          className="win95-input"
+          style={{ width: 48, textAlign: 'right', fontSize: '0.85em', padding: '1px 4px' }}
+          min={0}
+          max={200}
+          value={Math.round(projectProductivity * 100)}
+          onChange={e => handleProjectProductivityChange(e.target.value)}
+          title="Project-wide productivity factor (0–200%)"
+        />
+        <span style={{ fontSize: '0.85em' }}>%</span>
+        <label style={{ fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <input
+            type="checkbox"
+            checked={normalizeView}
+            onChange={e => handleNormalizeChange(e.target.checked)}
+          />
+          Normalize/worker
+        </label>
       </div>
       <div className="win95-groupbox">
         <div className="win95-groupbox-title">Resource Income</div>
-        {renderIncomeTable(projectBuildings)}
+        {renderIncomeTable(projectBuildings, { showProductivityOverride: true, flowOpts: section1FlowOpts })}
         {omittedCount > 0 && (
           <div className="win95-statusbar">
             {omittedCount} building(s) not shown: no production flows.

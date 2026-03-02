@@ -1,6 +1,7 @@
 import {
   fetchProjects, createProjectAPI, deleteProjectAPI,
   addBuildingAPI, removeBuildingAPI, updateBuildingQtyAPI,
+  updateBuildingProductivityAPI,
   updateCountryPricesAPI, importProjectsAPI,
 } from './api'
 
@@ -31,6 +32,11 @@ export async function removeBuilding(projectId, position, countryId = null) {
 
 export async function updateBuildingQty(projectId, position, qty, countryId = null) {
   await updateBuildingQtyAPI(projectId, position, qty)
+  return fetchProjects(countryId)
+}
+
+export async function updateBuildingProductivity(projectId, position, productivity, countryId = null) {
+  await updateBuildingProductivityAPI(projectId, position, productivity)
   return fetchProjects(countryId)
 }
 

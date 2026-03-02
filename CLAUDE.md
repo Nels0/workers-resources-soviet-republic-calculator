@@ -159,7 +159,8 @@ cd backend && uv run pytest         # Backend tests
   - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
   - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure
   - Each chain: inline rename, `☐ Prod.` + `☐ Norm.` checkboxes (control chain economics only, persisted in `localStorage` `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building income table (with `ProductivitySlider`) + chain economics panel
-  - Chain economics panel: Produced / Consumed / Net table with per-resource ☐ inclusion checkboxes (persisted in `localStorage` `chain-include-${projectId}`); statusbar Import/Export/Net ₽
+  - Chain economics panel: Produced / Consumed / Net + Coverage table with per-resource ☐ inclusion checkboxes; statusbar Import/Export/Net ₽; "Unused capacity" section lists supply-constrained buildings
+  - `computeChainEconomics` uses **iterative constraint propagation** (`cfactor` per building, max 20 passes): if a resource is produced AND consumed within the chain and supply < demand, consuming buildings' `cfactor` is multiplied by `coverage` ratio each pass until convergence. Constrained buildings' output is proportionally reduced, cascading through multi-stage chains. Coverage column shows ~100% (balanced/constrained) or >100% (surplus) at convergence; red shortage % never appears post-convergence.
   - Move dropdown excludes the building's own current chain from options
   - Ungrouped groupbox shows buildings not in any chain; `ProductivitySlider` shown there too
   - Deleting a building from the project (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)

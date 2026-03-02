@@ -514,19 +514,16 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
     )
   }
 
-  // Compute per-resource produced/consumed/net for a set of project buildings
+  // Compute per-resource produced/consumed/net for a set of project buildings.
+  // Uses iterative constraint propagation: when internal supply of a resource is insufficient,
+  // consuming buildings are scaled down proportionally (cascading through the chain).
   function computeChainEconomics(pbs, opts = { applyProductivity: true, applyNormalize: false }) {
     const activePbs = pbs.filter(pb => buildingMap[pb.buildingId])
     const activeResources = getActiveResources(activePbs)
 
-    const produced = {}
-    const consumed = {}
-    const net = {}
-
-    for (const r of activeResources) {
-      produced[r.id] = 0
-      consumed[r.id] = 0
-    }
+    // Base flows with productivity/normalize applied, before supply constraints
+    const pbBaseProduced = {}
+    const pbBaseConsumed = {}
 
     for (const pb of activePbs) {
       const b = buildingMap[pb.buildingId]
@@ -537,47 +534,128 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
             : projectProductivity)
         : 1.0
       const normFactor = (opts.applyNormalize && b.workers_needed > 0) ? b.workers_needed : 1.0
+      pbBaseProduced[pb.position] = {}
+      pbBaseConsumed[pb.position] = {}
       for (const r of activeResources) {
         const mult = periodMultiplier(r)
-        produced[r.id] += (b.produces?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
-        consumed[r.id] += (b.consumes?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
+        pbBaseProduced[pb.position][r.id] = (b.produces?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
+        pbBaseConsumed[pb.position][r.id] = (b.consumes?.[String(r.id)] || 0) * pb.quantity * mult * factor / normFactor
+      }
+    }
+
+    // cfactor[pos]: supply-constraint multiplier per building (starts at 1.0).
+    // Effective flow = base × cfactor. Distinct from productivity (already in pbBase*).
+    const cfactor = {}
+    const buildingLimitedBy = {}  // pos → rid of the most constraining resource
+    for (const pb of activePbs) cfactor[pb.position] = 1.0
+
+    // Iterate until convergence: in each pass, compute effective totals, find coverage ratios for
+    // internally-exchanged resources, and scale down consuming buildings that are over-allocated.
+    // For acyclic chains this converges in at most chain-depth passes.
+    for (let iter = 0; iter < 20; iter++) {
+      const effProduced = {}, effConsumed = {}
+      for (const r of activeResources) { effProduced[r.id] = 0; effConsumed[r.id] = 0 }
+      for (const pb of activePbs) {
+        const cf = cfactor[pb.position]
+        for (const r of activeResources) {
+          effProduced[r.id] += pbBaseProduced[pb.position][r.id] * cf
+          effConsumed[r.id] += pbBaseConsumed[pb.position][r.id] * cf
+        }
+      }
+
+      // coverage[rid]: for internally-exchanged resources, how well supply meets demand
+      const coverage = {}
+      for (const r of activeResources) {
+        if (effProduced[r.id] > 0 && effConsumed[r.id] > 0) {
+          coverage[r.id] = effProduced[r.id] / effConsumed[r.id]
+        }
+      }
+
+      let anyChanged = false
+      for (const pb of activePbs) {
+        let minCov = 1.0
+        let limitRid = null
+        for (const r of activeResources) {
+          const c = pbBaseConsumed[pb.position][r.id]
+          if (c > 0 && coverage[r.id] != null && coverage[r.id] < minCov - 1e-9) {
+            minCov = coverage[r.id]
+            limitRid = r.id
+          }
+        }
+        if (minCov < 1.0 - 1e-9) {
+          const newCf = cfactor[pb.position] * minCov
+          if (Math.abs(newCf - cfactor[pb.position]) > 1e-9) {
+            cfactor[pb.position] = newCf
+            buildingLimitedBy[pb.position] = limitRid
+            anyChanged = true
+          }
+        }
+      }
+
+      if (!anyChanged) break
+    }
+
+    // Final effective totals at converged cfactors
+    const produced = {}, consumed = {}, net = {}
+    for (const r of activeResources) { produced[r.id] = 0; consumed[r.id] = 0 }
+    for (const pb of activePbs) {
+      const cf = cfactor[pb.position]
+      for (const r of activeResources) {
+        produced[r.id] += pbBaseProduced[pb.position][r.id] * cf
+        consumed[r.id] += pbBaseConsumed[pb.position][r.id] * cf
+      }
+    }
+
+    // Coverage at convergence: shortage resources balance to ~1.0; surplus resources are >1.0
+    const coverage = {}
+    for (const r of activeResources) {
+      if (produced[r.id] > 0 && consumed[r.id] > 0) {
+        coverage[r.id] = produced[r.id] / consumed[r.id]
+      }
+    }
+
+    // Buildings whose base throughput is reduced by supply constraints
+    const buildingUtilization = {}
+    for (const pb of activePbs) {
+      if (cfactor[pb.position] < 1.0 - 1e-6) {
+        buildingUtilization[pb.position] = cfactor[pb.position]
       }
     }
 
     let importRubles = 0
     let exportRubles = 0
-
     for (const r of activeResources) {
       net[r.id] = produced[r.id] - consumed[r.id]
       if (!isIncluded(String(r.id))) continue
-      if (net[r.id] < 0) {
-        importRubles += Math.abs(net[r.id]) * importPrice(r)
-      } else if (net[r.id] > 0) {
-        exportRubles += net[r.id] * exportPrice(r)
-      }
+      if (net[r.id] < 0) importRubles += Math.abs(net[r.id]) * importPrice(r)
+      else if (net[r.id] > 0) exportRubles += net[r.id] * exportPrice(r)
     }
 
     return {
-      activeResources,
-      produced,
-      consumed,
-      net,
-      importRubles,
-      exportRubles,
-      netRubles: exportRubles - importRubles,
+      activeResources, produced, consumed, net, coverage,
+      buildingUtilization, buildingLimitedBy,
+      importRubles, exportRubles, netRubles: exportRubles - importRubles,
     }
   }
 
   function renderChainEconomics(pbs, opts = { applyProductivity: true, applyNormalize: false }) {
-    const { activeResources, produced, consumed, net, importRubles, exportRubles, netRubles } =
-      computeChainEconomics(pbs, opts)
+    const {
+      activeResources, produced, consumed, net,
+      coverage, buildingUtilization, buildingLimitedBy,
+      importRubles, exportRubles, netRubles,
+    } = computeChainEconomics(pbs, opts)
 
+    const activePbs = pbs.filter(pb => buildingMap[pb.buildingId])
     const nonZero = activeResources.filter(r => produced[r.id] !== 0 || consumed[r.id] !== 0)
     if (nonZero.length === 0) return null
 
+    const hasCoverage = nonZero.some(r => coverage[r.id] != null)
     const suffix = PERIODS[period].suffix
     const netRubleColor = netRubles > 0 ? '#000080' : netRubles < 0 ? '#c00000' : undefined
     const normalize = opts.applyNormalize || false
+
+    // Buildings whose throughput is constrained by internal resource supply
+    const bottleneckedPbs = activePbs.filter(pb => buildingUtilization[pb.position] != null)
 
     return (
       <div>
@@ -589,6 +667,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
                 <th>Produced</th>
                 <th>Consumed</th>
                 <th>Net</th>
+                {hasCoverage && <th title="Internal supply coverage: how much of chain consumption is met by chain production">Coverage</th>}
                 {hasAnyPrice && <th title="Include in ₽ totals">☐</th>}
               </tr>
             </thead>
@@ -599,12 +678,34 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
                 const netColor = n < 0 ? '#c00000' : undefined
                 const netLabel = n > 0 ? `+${Math.round(n * 100) / 100} ↑` :
                                  n < 0 ? `${Math.round(n * 100) / 100} ↓` : '0'
+                let coverageCell = null
+                if (coverage[r.id] != null) {
+                  const pct = Math.round(coverage[r.id] * 100)
+                  if (coverage[r.id] > 1.005) {
+                    // Surplus: chain produces more of this resource than chain consumers can use
+                    // (Shortage resources converge to ~100% after constraint propagation)
+                    const surplus = Math.round(net[r.id] * 100) / 100
+                    coverageCell = (
+                      <span style={{ color: '#000080' }} title={`${surplus} ${r.unit}${suffix} surplus — ${pct - 100}% excess production beyond what chain consumers need`}>
+                        {pct}%
+                      </span>
+                    )
+                  } else {
+                    // ~100%: internally balanced (was constrained; consumers scaled to match supply)
+                    coverageCell = (
+                      <span className="win95-muted" title="Internally balanced — consuming buildings scaled to available supply">
+                        ~100%
+                      </span>
+                    )
+                  }
+                }
                 return (
                   <tr key={r.id}>
                     <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({pUnit})</span></td>
                     <td className="num">{produced[r.id] ? Math.round(produced[r.id] * 100) / 100 : ''}</td>
                     <td className="num">{consumed[r.id] ? Math.round(consumed[r.id] * 100) / 100 : ''}</td>
                     <td className="num" style={{ color: netColor }}>{netLabel}</td>
+                    {hasCoverage && <td className="num">{coverageCell}</td>}
                     {hasAnyPrice && (
                       <td style={{ textAlign: 'center' }}>
                         <input
@@ -620,6 +721,25 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
             </tbody>
           </table>
         </div>
+        {bottleneckedPbs.length > 0 && (
+          <div className="win95-inset" style={{ marginTop: 4, padding: '3px 6px', fontSize: '0.85em' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Unused capacity:</div>
+            {bottleneckedPbs.map(pb => {
+              const b = buildingMap[pb.buildingId]
+              const util = buildingUtilization[pb.position]
+              const limitRid = buildingLimitedBy[pb.position]
+              const limitResource = activeResources.find(r => String(r.id) === String(limitRid))
+              const usedPct = Math.round(util * 100)
+              const unusedPct = 100 - usedPct
+              return (
+                <div key={pb.position} style={{ color: '#c00000' }}>
+                  {b.name}
+                  {pb.quantity > 1 ? ` (×${pb.quantity})` : ''}: {unusedPct}% unused — limited by {limitResource?.name ?? '?'}
+                </div>
+              )
+            })}
+          </div>
+        )}
         {hasAnyPrice && (
           <div className="win95-statusbar" style={{ display: 'flex', gap: 12 }}>
             <span>Import: ₽{Math.round(importRubles * 100) / 100}{suffix}</span>

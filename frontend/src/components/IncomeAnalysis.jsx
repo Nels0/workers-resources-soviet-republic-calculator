@@ -418,10 +418,10 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
           <thead>
             <tr>
               <th style={{ width: '100%', textAlign: 'left' }}>Building</th>
+              {showMove && <th></th>}
               <th>Qty</th>
               {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r.unit, normalize)})</th>)}
               {hasAnyPrice && <th>₽ Net</th>}
-              {showMove && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -446,17 +446,18 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
                       </div>
                     )}
                   </td>
+
+                  {showMove && (
+                    <td>
+                      {renderMoveDropdown(pb)}
+                    </td>
+                  )}
                   <td className="num">{pb.quantity}</td>
                   {activeResources.map(r => (
                     <td key={r.id} className="num">{renderNetCell(getNetFlow(b, pb, r, flowOpts))}</td>
                   ))}
                   {hasAnyPrice && (
                     <td className="num">{renderRubleCell(rubles, hasUnpriced)}</td>
-                  )}
-                  {showMove && (
-                    <td>
-                      {renderMoveDropdown(pb)}
-                    </td>
                   )}
                 </tr>
               )
@@ -466,13 +467,14 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
             <tr style={{ background: '#e8e8e8' }}>
               <td style={{ fontWeight: 'bold' }}>Net</td>
               <td></td>
+
+              {showMove && <td></td>}
               {activeResources.map(r => (
                 <td key={r.id} className="num">{renderNetCell(totals[r.id])}</td>
               ))}
               {hasAnyPrice && (
                 <td className="num">{renderRubleCell(totalRubles, totalHasUnpriced)}</td>
               )}
-              {showMove && <td></td>}
             </tr>
           </tfoot>
         </table>
@@ -508,7 +510,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
         onChange={e => handleMoveBuilding(pb.position, e.target.value)}
         title="Move to chain"
       >
-        <option value="ungrouped">Ungrouped</option>
+        <option value="ungrouped">-</option>
         {availableChains.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
     )
@@ -1144,7 +1146,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
         </label>
       </div>
       <div className="win95-groupbox">
-        <div className="win95-groupbox-title">Resource Income</div>
+        <div className="win95-groupbox-title">Resource Flows</div>
         {renderIncomeTable(projectBuildings, { showProductivityOverride: true, flowOpts: section1FlowOpts })}
         {omittedCount > 0 && (
           <div className="win95-statusbar">

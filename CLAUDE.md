@@ -142,7 +142,8 @@ cd backend && uv run pytest         # Backend tests
 
 ### Income Analysis (`components/IncomeAnalysis.jsx`)
 - Props: `{ projectId, projectBuildings, prices }` — fetches its own buildings/resources from API
-- **Section 1 — Resource Income table**: sparse columns per resource (produces or consumes); net flow per cell = `(produced − consumed) × qty`; positive black `↑`, negative red `↓`; ₽ Net column when any price is set; partial-price indicator `(+?)` with tooltip when some resources unpriced; footer Net row; omitted-buildings statusbar note when buildings have no flows
+- **Period selector**: toolbar row above both sections (Day / Week / Month / Year, default Month); affects all flow values and unit labels throughout. Raw `.ini` values are per-game-day; conversion: `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant holds `materialFactor`, `elecFactor`, `suffix` per period. Resources with `unit === 'MW'` use `elecFactor`; all others use `materialFactor`.
+- **Section 1 — Resource Income table**: sparse columns per resource (produces or consumes); net flow per cell = `(produced − consumed) × qty × periodMultiplier`; column headers show `periodUnit` (e.g. `t/mo`, `MWh/mo`); positive black `↑`, negative red `↓`; ₽ Net column when any price is set; partial-price indicator `(+?)` with tooltip when some resources unpriced; footer Net row; omitted-buildings statusbar note when buildings have no flows
 - **Section 2 — Chain Builder**: groups buildings by shared resource relationships
   - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
   - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure

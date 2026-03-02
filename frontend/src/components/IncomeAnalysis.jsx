@@ -10,6 +10,13 @@ import {
   createProjectChainAPI,
 } from '../api'
 
+const PERIODS = {
+  day:   { label: 'Day',   suffix: '/day', materialFactor: 5,                   elecFactor: 24 },
+  week:  { label: 'Week',  suffix: '/wk',  materialFactor: 5 * 7,               elecFactor: 24 * 7 },
+  month: { label: 'Month', suffix: '/mo',  materialFactor: 5 * 365.2425 / 12,   elecFactor: 24 * 365.2425 / 12 },
+  year:  { label: 'Year',  suffix: '/yr',  materialFactor: 5 * 365.2425,        elecFactor: 24 * 365.2425 },
+}
+
 function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
@@ -19,6 +26,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   const [savingChains, setSavingChains] = useState(false)
   const [chainError, setChainError] = useState(null)
   const [showAutoDetectConfirm, setShowAutoDetectConfirm] = useState(false)
+  const [period, setPeriod] = useState('month')
 
   useEffect(() => {
     fetchBuildingsList()
@@ -84,8 +92,19 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
 
   // --- Helpers ---
 
+  function periodMultiplier(r) {
+    const p = PERIODS[period]
+    return r.unit === 'MW' ? p.elecFactor : p.materialFactor
+  }
+
+  function periodUnit(unit) {
+    const suffix = PERIODS[period].suffix
+    return unit === 'MW' ? 'MWh' + suffix : unit + suffix
+  }
+
   function getNetFlow(b, pb, r) {
-    return ((b.produces?.[String(r.id)] || 0) - (b.consumes?.[String(r.id)] || 0)) * pb.quantity
+    const raw = ((b.produces?.[String(r.id)] || 0) - (b.consumes?.[String(r.id)] || 0)) * pb.quantity
+    return raw * periodMultiplier(r)
   }
 
   function computeRubleNet(b, pb, activeResources) {
@@ -177,7 +196,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             <tr>
               <th>Building</th>
               <th>Qty</th>
-              {activeResources.map(r => <th key={r.id}>{r.name} ({r.unit})</th>)}
+              {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r.unit)})</th>)}
               {hasAnyPrice && <th>₽ Net</th>}
               {showMove && <th></th>}
             </tr>
@@ -290,13 +309,13 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
           const val = Math.round(net * 100) / 100
           return (
             <span key={r.id} style={{ color: net > 0 ? undefined : '#c00000' }}>
-              {net > 0 ? '↑' : '↓'} {r.name}: {Math.abs(val)}{r.unit}
+              {net > 0 ? '↑' : '↓'} {r.name}: {Math.abs(val)} {periodUnit(r.unit)}
             </span>
           )
         })}
         {hasAnyPrice && anyPriced && (
           <span style={{ color: totalRubles > 0 ? '#000080' : '#c00000', fontWeight: 'bold' }}>
-            | ₽ {Math.round(totalRubles * 100) / 100}
+            | ₽ {Math.round(totalRubles * 100) / 100}{PERIODS[period].suffix}
           </span>
         )}
       </div>
@@ -632,6 +651,21 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
 
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: '0.85em' }}>Period:</span>
+        {Object.entries(PERIODS).map(([key, p]) => (
+          <button
+            key={key}
+            className="win95-btn"
+            style={{
+              fontSize: '0.85em',
+              padding: '1px 6px',
+              ...(period === key ? { boxShadow: 'inset 1px 1px #808080, inset -1px -1px #ffffff' } : {}),
+            }}
+            onClick={() => setPeriod(key)}
+          >{p.label}</button>
+        ))}
+      </div>
       <div className="win95-groupbox">
         <div className="win95-groupbox-title">Resource Income</div>
         {renderIncomeTable(projectBuildings)}

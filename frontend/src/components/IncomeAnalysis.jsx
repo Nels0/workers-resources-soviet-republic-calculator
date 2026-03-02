@@ -24,7 +24,7 @@ function ProductivitySlider({ value, onChange, hasOverride, onClear }) {
       const rect = containerRef.current?.getBoundingClientRect()
       if (!rect) return 0
       const fraction = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width))
-      return Math.round(fraction * 10) / 10
+      return fraction
     }
     function onMove(e) {
       if (!isDragging.current) return

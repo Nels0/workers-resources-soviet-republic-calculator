@@ -116,11 +116,6 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
 
   return (
     <div>
-      {savedFlash && (
-        <div style={{ padding: '2px 4px', fontSize: '0.85em', color: 'var(--win95-blue)' }}>
-          Saved
-        </div>
-      )}
       <div className="win95-inset win95-table-wrap">
         <table className="win95-table win95-table-static">
           <thead>
@@ -165,6 +160,11 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
           </tbody>
         </table>
       </div>
+      {savedFlash && (
+        <div style={{ padding: '2px 4px', fontSize: '0.85em', color: 'var(--win95-blue)' }}>
+          Saved
+        </div>
+      )}
     </div>
   )
 }

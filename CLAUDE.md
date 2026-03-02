@@ -27,6 +27,69 @@ cd backend && uv run pytest         # Backend tests
 - **Styling:** Custom Windows 95 theme (`src/win95.css`) — no CSS frameworks
 - **API reference:** [API.md](API.md)
 
+## Design Philosophy
+
+### Functionality First
+- Every element must earn its place by serving a user task (browsing buildings, planning projects, pricing resources)
+- No decorative UI — all components exist to present or manipulate data
+- Information density is preferred over whitespace; this is a data tool, not a landing page
+- Keep controls close to their context: search above its results, totals below the table they summarize
+- Immediate visual feedback on every action; avoid multi-step confirmations for reversible operations
+- Auto-save where it makes sense (prices panel); avoid requiring explicit Save clicks
+
+### Design Hierarchy Mirrors Data Model
+- Visual structure reflects the domain hierarchy: **Country → Project → Building → Resource**
+- Country is the outermost context — taskbar-level global selector, persists across all pages
+- Projects are the primary work unit — own page, own tabs, own totals
+- Buildings are items within projects — rows in tables, selected via search, navigable to detail pages
+- Resources are attributes of buildings — sparse columns, never presented as standalone objects
+- Navigation depth corresponds to model depth: list → detail (Buildings: list / building page)
+- Nesting in the UI mirrors nesting in the data: groupboxes contain sub-sections the same way a project contains operation and construction phases
+
+### Skeuomorphism
+- Every interactive element should feel like a physical object that can be pressed or manipulated
+- **Raised surfaces** (buttons, tabs, windows, toolbars): light top/left border, dark bottom/right border — protrudes toward the viewer
+- **Inset surfaces** (inputs, scroll areas, table wrappers): dark top/left border, light bottom/right border — recedes from the viewer
+- **Pressed/active states**: invert the border to simulate physical depression
+- Dialogs are elevated above the desktop with a `4px 4px 0` drop shadow
+- The side panel has a lateral shadow suggesting it slides over content from the right
+- Windows float on a teal desktop background — the classic desktop metaphor
+- Titlebar gradient (navy → lighter blue) signals window focus and ownership
+- Non-functional titlebar buttons (─ □ ✕) are present as authentic window chrome
+
+### Earlier-Computing Aesthetic
+- Primary visual reference: **Windows 95 / Windows NT 4 era UI** — not Windows XP, not Metro
+- Font: `MS Sans Serif` (Tahoma fallback) — no system-ui, no web fonts, no variable fonts
+- Restricted color palette: `#c0c0c0` gray, `#000080` navy, `#008080` teal, `#ffffff`, `#000000`, `#808080` mid-gray
+- No CSS transitions or animations — Win95 UI changes were instantaneous
+- No rounded corners (Win95 had none on standard controls)
+- No blur, gradients outside of title bars, or modern visual effects
+- Pixel-precise borders (2px raised, 1px inset) — no anti-aliasing tricks
+- Status bars at the bottom of content panels for counts and feedback (standard Win95 info strip)
+- Dotted focus ring on default buttons (`outline: 1px dotted black; outline-offset: -4px`) — the Win95 default-button indicator
+
+### Color Semantics
+- **Navy `#000080`**: all primary interactive/active states — links, selected rows, title bars, ruble cost sub-lines
+- **Gray `#c0c0c0`**: all neutral surfaces — backgrounds, buttons, borders
+- **Teal `#008080`**: page/desktop background only — never used for content
+- **Muted gray `#808080`**: secondary/contextual info — `source_file` labels, disabled states, units
+- **Red `#c00000`**: negative values — net resource consumption in flow tables
+- **Navy sub-line text**: secondary numeric info (ruble costs) rendered at `0.85em` in `#000080` beneath primary unit values
+
+### Table Design
+- Tables only render columns for resources/data that have ≥1 non-zero value (sparse columns) — reduces noise
+- Sticky headers on all scrollable tables; sort arrows (`▲`/`▼`) on sortable columns
+- Alternating row colors (`#ffffff` / `#f0f0f0`); hover inverts to `#808080` background with white text
+- Selected rows use the same navy blue as hover for visual consistency
+- Footer `<tfoot>` rows for totals; never inline sums in the last data row
+- Numeric cells are right-aligned with tabular figures (`font-variant-numeric: tabular-nums`)
+- Building names always show `source_file` alongside in smaller muted text to disambiguate duplicates
+
+### Keyboard Navigation
+- Search interfaces must be fully operable without a mouse: ↑↓ to navigate results, Enter to confirm, Tab to word-complete
+- Selected row always scrolls into view automatically
+- Text filter inputs accept typing immediately without requiring a button click
+
 ## Conventions
 
 ### UI / CSS

@@ -273,7 +273,7 @@ function ProjectView({ countryId, prices = {} }) {
           className={`win95-tab${activeTab === 'construction' ? ' active' : ''}`}
           onClick={() => setActiveTab('construction')}
         >
-          Construction Costs
+          Construction
         </button>
         <button
           className={`win95-tab${activeTab === 'operation' ? ' active' : ''}`}

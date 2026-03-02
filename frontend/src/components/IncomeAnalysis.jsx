@@ -234,7 +234,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
         <table className="win95-table win95-table-static">
           <thead>
             <tr>
-              <th>Building</th>
+              <th style={{ width: '100%', textAlign: 'left' }}>Building</th>
               <th>Qty</th>
               {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r.unit)})</th>)}
               {hasAnyPrice && <th>₽ Net</th>}

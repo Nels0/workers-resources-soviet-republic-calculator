@@ -174,7 +174,7 @@ cd backend && uv run pytest         # Backend tests
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
   - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
-- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation (Operation Costs + Resource Income + Chain Builder)
+- **Planning** section: Projects (`/projects`) — two tabs: **Construction Costs** / **Operation** (Resource Income + Chain Builder)
 - **Resource Prices** panel: toggled by "Prices" button in taskbar; fixed right-side panel (`win95-side-panel`), available on all pages
 
 ### Data Models
@@ -192,8 +192,6 @@ cd backend && uv run pytest         # Backend tests
 
 ## Upcoming Work
 
-- **Merge Operation + Income tabs** — `plan3.md`; strip Resource Flows from `OperationCosts.jsx`, combine into single "Operation" tab in `ProjectView.jsx`
 - **Project import/export** — JSON download/upload for sharing projects
 - **Building detail enrichment** — storage capacity, vehicle compatibility (production flows already shown)
 - **Resource summary dashboard** — aggregate view across all projects
-- **Operation cost rates** — per-day/per-cycle normalization for ongoing expense planning

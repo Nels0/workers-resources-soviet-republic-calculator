@@ -6,7 +6,6 @@ import {
 } from '../projectStorage'
 import { usePersistedState } from '../usePersistedState'
 import CostCalculator from './CostCalculator'
-import OperationCosts from './OperationCosts'
 import IncomeAnalysis from './IncomeAnalysis'
 
 function ProjectView({ countryId, prices = {} }) {
@@ -280,13 +279,7 @@ function ProjectView({ countryId, prices = {} }) {
           className={`win95-tab${activeTab === 'operation' ? ' active' : ''}`}
           onClick={() => setActiveTab('operation')}
         >
-          Operation Costs
-        </button>
-        <button
-          className={`win95-tab${activeTab === 'income' ? ' active' : ''}`}
-          onClick={() => setActiveTab('income')}
-        >
-          Income
+          Operation
         </button>
       </div>
 
@@ -301,12 +294,6 @@ function ProjectView({ countryId, prices = {} }) {
           />
         )}
         {activeTab === 'operation' && (
-          <OperationCosts
-            projectBuildings={project?.buildings || []}
-            prices={prices}
-          />
-        )}
-        {activeTab === 'income' && (
           <IncomeAnalysis
             projectId={project?.id}
             projectBuildings={project?.buildings || []}

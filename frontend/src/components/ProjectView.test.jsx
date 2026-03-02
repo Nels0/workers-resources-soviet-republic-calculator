@@ -8,8 +8,8 @@ import ProjectView from './ProjectView'
 vi.mock('./CostCalculator', () => ({
   default: () => <div data-testid="cost-calculator" />
 }))
-vi.mock('./OperationCosts', () => ({
-  default: () => <div data-testid="operation-costs" />
+vi.mock('./IncomeAnalysis', () => ({
+  default: () => <div data-testid="income-analysis" />
 }))
 
 // Mock projectStorage
@@ -225,6 +225,40 @@ describe('ProjectView create project', () => {
     await waitFor(() => {
       expect(screen.getByText('My Base')).toBeInTheDocument()
     })
+  })
+})
+
+describe('ProjectView tab structure', () => {
+  const project = { id: 'p1', name: 'Test Project', buildings: [], country_id: 'c1' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockStorage.migrateFromLocalStorage.mockResolvedValue(false)
+    mockStorage.loadProjects.mockResolvedValue([project])
+  })
+
+  it('shows Construction Costs and Operation tabs, no Income tab', async () => {
+    renderProjectView()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Construction Costs' })).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Operation' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Income' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Operation Costs' })).not.toBeInTheDocument()
+  })
+
+  it('renders IncomeAnalysis in the Operation tab', async () => {
+    const user = userEvent.setup()
+    renderProjectView()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Operation' })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Operation' }))
+
+    expect(screen.getByTestId('income-analysis')).toBeInTheDocument()
   })
 })
 

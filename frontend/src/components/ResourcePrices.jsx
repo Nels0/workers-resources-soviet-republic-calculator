@@ -56,7 +56,9 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
         const b = buildingMap[pb.buildingId]
         if (!b) return false
         return (b.resource_costs?.[String(r.id)] || 0) > 0 ||
-               (b.operation_costs?.[String(r.id)] || 0) > 0
+               (b.operation_costs?.[String(r.id)] || 0) > 0 ||
+               (b.produces?.[String(r.id)] || 0) > 0 ||
+               (b.consumes?.[String(r.id)] || 0) > 0
       })
     )
   }, [resources, projectBuildings, buildingMap])
@@ -65,8 +67,11 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
   localPricesRef.current = localPrices
   usedResourcesRef.current = usedResources
 
-  function handlePriceChange(resourceId, value) {
-    setLocalPrices(prev => ({ ...prev, [String(resourceId)]: value }))
+  function handlePriceChange(resourceId, field, value) {
+    setLocalPrices(prev => ({
+      ...prev,
+      [String(resourceId)]: { ...(prev[String(resourceId)] || {}), [field]: value },
+    }))
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
@@ -74,8 +79,10 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
       const cleaned = {}
       for (const r of usedResourcesRef.current) {
         const key = String(r.id)
-        const val = parseFloat(localPricesRef.current[key])
-        if (val && val > 0) cleaned[key] = val
+        const entry = localPricesRef.current[key] || {}
+        const imp = parseFloat(entry.import) || 0
+        const exp = parseFloat(entry.export) || 0
+        if (imp > 0 || exp > 0) cleaned[key] = { import: imp, export: exp }
       }
       onUpdatePricesRef.current(cleaned)
       setSavedFlash(true)
@@ -119,28 +126,42 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
           <thead>
             <tr>
               <th>Resource</th>
-              <th>Type</th>
-              <th>Price</th>
+              <th>Import ₽</th>
+              <th>Export ₽</th>
             </tr>
           </thead>
           <tbody>
-            {usedResources.map(r => (
-              <tr key={r.id}>
-                <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({r.unit})</span></td>
-                <td>{r.type}</td>
-                <td>
-                  <input
-                    type="number"
-                    className="win95-input"
-                    style={{ width: 80 }}
-                    min="0"
-                    step="any"
-                    value={localPrices[String(r.id)] ?? ''}
-                    onChange={e => handlePriceChange(r.id, e.target.value)}
-                  />
-                </td>
-              </tr>
-            ))}
+            {usedResources.map(r => {
+              const key = String(r.id)
+              const entry = localPrices[key] || {}
+              return (
+                <tr key={r.id}>
+                  <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({r.unit})</span></td>
+                  <td>
+                    <input
+                      type="number"
+                      className="win95-input"
+                      style={{ width: 70 }}
+                      min="0"
+                      step="any"
+                      value={entry.import ?? ''}
+                      onChange={e => handlePriceChange(r.id, 'import', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      className="win95-input"
+                      style={{ width: 70 }}
+                      min="0"
+                      step="any"
+                      value={entry.export ?? ''}
+                      onChange={e => handlePriceChange(r.id, 'export', e.target.value)}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -141,7 +141,7 @@ class TestDeleteCountry:
         cid = resp.get_json()["id"]
 
         client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.0}
+            "prices": {"1": {"import": 10.0, "export": 0}}
         })
 
         client_with_resources.delete(f"/api/countries/{cid}")
@@ -201,22 +201,28 @@ class TestCountryPrices:
         cid = resp.get_json()["id"]
 
         resp = client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.5, "2": 20.0}
+            "prices": {
+                "1": {"import": 10.5, "export": 0},
+                "2": {"import": 0, "export": 20.0},
+            }
         })
         assert resp.status_code == 200
-        assert resp.get_json() == {"1": 10.5, "2": 20.0}
+        assert resp.get_json() == {
+            "1": {"import": 10.5, "export": 0.0},
+            "2": {"import": 0.0, "export": 20.0},
+        }
 
     def test_get_prices_after_put(self, client_with_resources):
         resp = client_with_resources.post("/api/countries", json={"name": "Test"})
         cid = resp.get_json()["id"]
 
         client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.5}
+            "prices": {"1": {"import": 10.5, "export": 0}}
         })
 
         resp = client_with_resources.get(f"/api/countries/{cid}/prices")
         assert resp.status_code == 200
-        assert resp.get_json() == {"1": 10.5}
+        assert resp.get_json() == {"1": {"import": 10.5, "export": 0.0}}
 
     def test_put_prices_same_resource_twice_no_error(self, client_with_resources):
         """Regression: second PUT for same resource must not raise UNIQUE constraint."""
@@ -224,43 +230,49 @@ class TestCountryPrices:
         cid = resp.get_json()["id"]
 
         client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.0}
+            "prices": {"1": {"import": 10.0, "export": 0}}
         })
         resp = client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 312.0}
+            "prices": {"1": {"import": 312.0, "export": 0}}
         })
         assert resp.status_code == 200
-        assert resp.get_json() == {"1": 312.0}
+        assert resp.get_json() == {"1": {"import": 312.0, "export": 0.0}}
 
     def test_put_prices_replaces_all(self, client_with_resources):
         resp = client_with_resources.post("/api/countries", json={"name": "Test"})
         cid = resp.get_json()["id"]
 
         client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.0, "2": 20.0}
+            "prices": {
+                "1": {"import": 10.0, "export": 0},
+                "2": {"import": 20.0, "export": 0},
+            }
         })
         resp = client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"3": 5.0}
+            "prices": {"3": {"import": 5.0, "export": 0}}
         })
-        assert resp.get_json() == {"3": 5.0}
+        assert resp.get_json() == {"3": {"import": 5.0, "export": 0.0}}
 
     def test_zero_prices_not_stored(self, client_with_resources):
         resp = client_with_resources.post("/api/countries", json={"name": "Test"})
         cid = resp.get_json()["id"]
 
         resp = client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.0, "2": 0}
+            "prices": {
+                "1": {"import": 10.0, "export": 0},
+                "2": {"import": 0, "export": 0},
+            }
         })
-        assert resp.get_json() == {"1": 10.0}
+        assert resp.get_json() == {"1": {"import": 10.0, "export": 0.0}}
 
     def test_null_prices_not_stored(self, client_with_resources):
         resp = client_with_resources.post("/api/countries", json={"name": "Test"})
         cid = resp.get_json()["id"]
 
         resp = client_with_resources.put(f"/api/countries/{cid}/prices", json={
-            "prices": {"1": 10.0, "2": None}
+            "prices": {"1": {"import": 10.0, "export": 0}, "2": None}
         })
-        assert resp.get_json() == {"1": 10.0}
+        assert resp.get_json() == {"1": {"import": 10.0, "export": 0.0}}
 
     def test_prices_404_for_nonexistent_country(self, client_with_resources):
         resp = client_with_resources.get("/api/countries/nonexistent/prices")

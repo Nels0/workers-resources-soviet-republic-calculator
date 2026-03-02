@@ -69,6 +69,13 @@ def delete_country(country_id):
         session.close()
 
 
+def _prices_dict(prices):
+    return {
+        str(p.resource_id): {"import": p.import_price, "export": p.export_price}
+        for p in prices
+    }
+
+
 @bp.route("/api/countries/<country_id>/prices")
 def get_country_prices(country_id):
     session = get_session()
@@ -76,7 +83,7 @@ def get_country_prices(country_id):
         country = session.get(Country, country_id)
         if not country:
             return jsonify({"error": "Country not found"}), 404
-        return jsonify({str(p.resource_id): p.price for p in country.prices})
+        return jsonify(_prices_dict(country.prices))
     finally:
         session.close()
 
@@ -98,16 +105,21 @@ def update_country_prices(country_id):
         ))
         session.flush()
 
-        for resource_id, price in data["prices"].items():
-            if price:
+        for resource_id, entry in data["prices"].items():
+            if not entry:
+                continue
+            import_p = float(entry.get("import") or 0)
+            export_p = float(entry.get("export") or 0)
+            if import_p > 0 or export_p > 0:
                 session.add(CountryResourcePrice(
                     country_id=country_id,
                     resource_id=int(resource_id),
-                    price=float(price),
+                    import_price=import_p,
+                    export_price=export_p,
                 ))
 
         session.commit()
         session.refresh(country)
-        return jsonify({str(p.resource_id): p.price for p in country.prices})
+        return jsonify(_prices_dict(country.prices))
     finally:
         session.close()

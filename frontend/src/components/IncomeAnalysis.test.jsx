@@ -54,7 +54,7 @@ const PROJECT_BUILDINGS_MIXED = [
   { buildingId: 2, quantity: 1, position: 1 },
 ]
 
-const PRICES_PARTIAL = { '10': '100' } // Steel priced at 100, Coal unpriced
+const PRICES_PARTIAL = { '10': { import: 100, export: 0 } } // Steel (import) priced at 100, Coal unpriced
 
 function renderIncomeAnalysis(props = {}) {
   const defaults = {

@@ -151,7 +151,7 @@ describe('CostCalculator Total Cost column', () => {
   it('shows Total ₽ column when prices are set', async () => {
     renderCostCalculator({
       projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
-      prices: { '1': 10 },
+      prices: { '1': { import: 10, export: 0 } },
     })
 
     await waitFor(() => {
@@ -164,7 +164,7 @@ describe('CostCalculator Total Cost column', () => {
     // Grand total = 200*10 = 2000
     renderCostCalculator({
       projectBuildings: [{ buildingId: 4, quantity: 2, position: 0 }],
-      prices: { '1': 10 },
+      prices: { '1': { import: 10, export: 0 } },
     })
 
     await waitFor(() => {
@@ -180,7 +180,7 @@ describe('CostCalculator Total Cost column', () => {
     // Grand total = 100*10 + 50*20 = 1000 + 1000 = 2000
     renderCostCalculator({
       projectBuildings: [{ buildingId: 4, quantity: 1, position: 0 }],
-      prices: { '1': 10, '2': 20 },
+      prices: { '1': { import: 10, export: 0 }, '2': { import: 20, export: 0 } },
     })
 
     await waitFor(() => {

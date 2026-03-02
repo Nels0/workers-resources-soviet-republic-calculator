@@ -27,6 +27,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
   const [chainError, setChainError] = useState(null)
   const [showAutoDetectConfirm, setShowAutoDetectConfirm] = useState(false)
   const [period, setPeriod] = useState('month')
+  const [included, setIncluded] = useState({})
 
   useEffect(() => {
     fetchBuildingsList()
@@ -50,6 +51,17 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
       .finally(() => setLoadingChains(false))
   }, [projectId])
 
+  // Load per-resource inclusion state from localStorage when project changes
+  useEffect(() => {
+    if (!projectId) return
+    try {
+      const stored = JSON.parse(localStorage.getItem(`chain-include-${projectId}`))
+      setIncluded(stored || {})
+    } catch {
+      setIncluded({})
+    }
+  }, [projectId])
+
   const buildingMap = useMemo(() => {
     const map = {}
     for (const b of allBuildings) map[b.id] = b
@@ -70,11 +82,6 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     return [...ids].map(id => rmap[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
   }, [resources, projectBuildings, buildingMap])
 
-  const hasAnyPrice = useMemo(() => {
-    if (!prices) return false
-    return flowResourceList.some(r => parseFloat(prices[String(r.id)]) > 0)
-  }, [prices, flowResourceList])
-
   // Count of project buildings with no flow data (for omitted-buildings note)
   const omittedCount = useMemo(() => {
     if (loadingBuildings) return 0
@@ -90,7 +97,40 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     [chains]
   )
 
-  // --- Helpers ---
+  // --- Price helpers ---
+
+  function importPrice(r) {
+    return parseFloat(prices?.[String(r.id)]?.import) || 0
+  }
+
+  function exportPrice(r) {
+    return parseFloat(prices?.[String(r.id)]?.export) || 0
+  }
+
+  const hasAnyPrice = useMemo(() => {
+    if (!prices) return false
+    return flowResourceList.some(r => importPrice(r) > 0 || exportPrice(r) > 0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prices, flowResourceList])
+
+  // --- Inclusion helpers ---
+
+  function isIncluded(rid) {
+    return included[String(rid)] !== false
+  }
+
+  function toggleIncluded(rid) {
+    setIncluded(prev => {
+      const wasIncluded = prev[String(rid)] !== false
+      const updated = { ...prev, [String(rid)]: !wasIncluded }
+      if (projectId) {
+        localStorage.setItem(`chain-include-${projectId}`, JSON.stringify(updated))
+      }
+      return updated
+    })
+  }
+
+  // --- Period helpers ---
 
   function periodMultiplier(r) {
     const p = PERIODS[period]
@@ -113,7 +153,7 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     for (const r of activeResources) {
       const net = getNetFlow(b, pb, r)
       if (net === 0) continue
-      const price = parseFloat(prices?.[String(r.id)]) || 0
+      const price = net > 0 ? exportPrice(r) : importPrice(r)
       if (price > 0) value += net * price
       else hasUnpriced = true
     }
@@ -178,13 +218,13 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
       }, 0)
     }
 
-    // Ruble total
+    // Ruble total (using import/export prices based on sign)
     let totalRubles = 0
     let totalHasUnpriced = false
     for (const r of activeResources) {
       const net = totals[r.id]
       if (net === 0) continue
-      const price = parseFloat(prices?.[String(r.id)]) || 0
+      const price = net > 0 ? exportPrice(r) : importPrice(r)
       if (price > 0) totalRubles += net * price
       else totalHasUnpriced = true
     }
@@ -280,43 +320,113 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
     )
   }
 
-  function renderChainStatusLine(pbs) {
+  // Compute per-resource produced/consumed/net for a set of project buildings
+  function computeChainEconomics(pbs) {
     const activePbs = pbs.filter(pb => buildingMap[pb.buildingId])
     const activeResources = getActiveResources(activePbs)
 
-    const totals = {}
+    const produced = {}
+    const consumed = {}
+    const net = {}
+
     for (const r of activeResources) {
-      totals[r.id] = activePbs.reduce((sum, pb) => {
-        const b = buildingMap[pb.buildingId]
-        return b ? sum + getNetFlow(b, pb, r) : sum
-      }, 0)
+      produced[r.id] = 0
+      consumed[r.id] = 0
     }
 
-    const nonZero = activeResources.filter(r => totals[r.id] !== 0)
+    for (const pb of activePbs) {
+      const b = buildingMap[pb.buildingId]
+      if (!b) continue
+      for (const r of activeResources) {
+        const mult = periodMultiplier(r)
+        produced[r.id] += (b.produces?.[String(r.id)] || 0) * pb.quantity * mult
+        consumed[r.id] += (b.consumes?.[String(r.id)] || 0) * pb.quantity * mult
+      }
+    }
+
+    let importRubles = 0
+    let exportRubles = 0
+
+    for (const r of activeResources) {
+      net[r.id] = produced[r.id] - consumed[r.id]
+      if (!isIncluded(String(r.id))) continue
+      if (net[r.id] < 0) {
+        importRubles += Math.abs(net[r.id]) * importPrice(r)
+      } else if (net[r.id] > 0) {
+        exportRubles += net[r.id] * exportPrice(r)
+      }
+    }
+
+    return {
+      activeResources,
+      produced,
+      consumed,
+      net,
+      importRubles,
+      exportRubles,
+      netRubles: exportRubles - importRubles,
+    }
+  }
+
+  function renderChainEconomics(pbs) {
+    const { activeResources, produced, consumed, net, importRubles, exportRubles, netRubles } =
+      computeChainEconomics(pbs)
+
+    const nonZero = activeResources.filter(r => produced[r.id] !== 0 || consumed[r.id] !== 0)
     if (nonZero.length === 0) return null
 
-    let totalRubles = 0
-    let anyPriced = false
-    for (const r of nonZero) {
-      const price = parseFloat(prices?.[String(r.id)]) || 0
-      if (price > 0) { totalRubles += totals[r.id] * price; anyPriced = true }
-    }
+    const suffix = PERIODS[period].suffix
+    const netRubleColor = netRubles > 0 ? '#000080' : netRubles < 0 ? '#c00000' : undefined
 
     return (
-      <div className="win95-statusbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {nonZero.map(r => {
-          const net = totals[r.id]
-          const val = Math.round(net * 100) / 100
-          return (
-            <span key={r.id} style={{ color: net > 0 ? undefined : '#c00000' }}>
-              {net > 0 ? '↑' : '↓'} {r.name}: {Math.abs(val)} {periodUnit(r.unit)}
+      <div>
+        <div className="win95-inset win95-table-wrap" style={{ marginTop: 4 }}>
+          <table className="win95-table win95-table-static">
+            <thead>
+              <tr>
+                <th>Resource</th>
+                <th>Produced</th>
+                <th>Consumed</th>
+                <th>Net</th>
+                {hasAnyPrice && <th title="Include in ₽ totals">☐</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {nonZero.map(r => {
+                const pUnit = periodUnit(r.unit)
+                const n = net[r.id]
+                const netColor = n < 0 ? '#c00000' : undefined
+                const netLabel = n > 0 ? `+${Math.round(n * 100) / 100} ↑` :
+                                 n < 0 ? `${Math.round(n * 100) / 100} ↓` : '0'
+                return (
+                  <tr key={r.id}>
+                    <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({pUnit})</span></td>
+                    <td className="num">{produced[r.id] ? Math.round(produced[r.id] * 100) / 100 : ''}</td>
+                    <td className="num">{consumed[r.id] ? Math.round(consumed[r.id] * 100) / 100 : ''}</td>
+                    <td className="num" style={{ color: netColor }}>{netLabel}</td>
+                    {hasAnyPrice && (
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isIncluded(String(r.id))}
+                          onChange={() => toggleIncluded(String(r.id))}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        {hasAnyPrice && (
+          <div className="win95-statusbar" style={{ display: 'flex', gap: 12 }}>
+            <span>Import: ₽{Math.round(importRubles * 100) / 100}{suffix}</span>
+            <span>Export: ₽{Math.round(exportRubles * 100) / 100}{suffix}</span>
+            <span style={{ color: netRubleColor, fontWeight: 'bold' }}>
+              Net: ₽{netRubles >= 0 ? '+' : ''}{Math.round(netRubles * 100) / 100}{suffix}
             </span>
-          )
-        })}
-        {hasAnyPrice && anyPriced && (
-          <span style={{ color: totalRubles > 0 ? '#000080' : '#c00000', fontWeight: 'bold' }}>
-            | ₽ {Math.round(totalRubles * 100) / 100}{PERIODS[period].suffix}
-          </span>
+          </div>
         )}
       </div>
     )
@@ -568,8 +678,10 @@ function IncomeAnalysis({ projectId, projectBuildings, prices }) {
             Dissolve
           </button>
         </div>
-        {renderIncomeTable(chainPbs, { showMove: true })}
-        {renderChainStatusLine(chainPbs)}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>{renderIncomeTable(chainPbs, { showMove: true })}</div>
+          <div style={{ flex: '0 0 auto' }}>{renderChainEconomics(chainPbs)}</div>
+        </div>
       </div>
     )
   }

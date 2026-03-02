@@ -48,12 +48,12 @@ DELETE /api/countries/<id>
 
 GET /api/countries/<id>/prices
   Get resource prices for a country.
-  Returns: { "<resourceId>": price, ... }
+  Returns: { "<resourceId>": { "import": price, "export": price }, ... }
 
 PUT /api/countries/<id>/prices
-  Bulk replace resource prices for a country. Zero/null prices are discarded.
-  Body: { prices: { "<resourceId>": price } }
-  Returns: { "<resourceId>": price, ... }
+  Bulk replace resource prices for a country. Entries where both import and export are 0/null are discarded.
+  Body: { prices: { "<resourceId>": { "import": price, "export": price } } }
+  Returns: { "<resourceId>": { "import": price, "export": price }, ... }
 
 ## Projects
 

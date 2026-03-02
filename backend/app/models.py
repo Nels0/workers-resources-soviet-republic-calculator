@@ -118,6 +118,8 @@ class CountryResourcePrice(Base):
     country_id: Mapped[str] = mapped_column(ForeignKey("countries.id"))
     resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"))
     price: Mapped[float] = mapped_column(Float, default=0.0)
+    import_price: Mapped[float] = mapped_column(Float, default=0.0)
+    export_price: Mapped[float] = mapped_column(Float, default=0.0)
 
     country: Mapped["Country"] = relationship(back_populates="prices")
 

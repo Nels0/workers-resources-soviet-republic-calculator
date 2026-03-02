@@ -62,12 +62,13 @@ describe('ResourcePrices', () => {
   })
 
   it('pre-fills prices from prop', async () => {
-    renderResourcePrices({ prices: { '1': 10.5 } })
+    renderResourcePrices({ prices: { '1': { import: 10.5, export: 0 } } })
 
     await waitFor(() => {
       expect(screen.getByText('Concrete')).toBeInTheDocument()
     })
 
+    // First spinbutton is Import ₽ for Concrete
     const inputs = screen.getAllByRole('spinbutton')
     expect(inputs[0].value).toBe('10.5')
   })
@@ -100,7 +101,7 @@ describe('ResourcePrices', () => {
 
     // Wait up to 2s for the 600ms debounce to fire
     await waitFor(() => {
-      expect(onUpdatePrices).toHaveBeenCalledWith({ '1': 15 })
+      expect(onUpdatePrices).toHaveBeenCalledWith({ '1': { import: 15, export: 0 } })
     }, { timeout: 2000 })
   })
 

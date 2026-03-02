@@ -142,7 +142,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
 
   const pricedResourceIds = useMemo(() => {
     if (!prices) return new Set()
-    return new Set(activeResources.filter(r => parseFloat(prices[String(r.id)]) > 0).map(r => r.id))
+    return new Set(activeResources.filter(r => parseFloat(prices[String(r.id)]?.import) > 0).map(r => r.id))
   }, [activeResources, prices])
 
   const hasAnyPrice = pricedResourceIds.size > 0
@@ -151,7 +151,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
     if (!hasAnyPrice) return 0
     let sum = 0
     for (const r of activeResources) {
-      const price = parseFloat(prices[String(r.id)]) || 0
+      const price = parseFloat(prices[String(r.id)]?.import) || 0
       if (price > 0) {
         sum += totals[r.id] * price
       }
@@ -191,7 +191,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                 if (!b) return null
                 const rowRubleTotal = hasAnyPrice
                   ? activeResources.reduce((sum, r) => {
-                      const price = parseFloat(prices?.[String(r.id)]) || 0
+                      const price = parseFloat(prices?.[String(r.id)]?.import) || 0
                       const amt = (b.resource_costs[String(r.id)] || 0) * pb.quantity
                       return sum + (price > 0 ? amt * price : 0)
                     }, 0)
@@ -214,7 +214,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                     </td>
                     {activeResources.map(r => {
                       const amt = (b.resource_costs[String(r.id)] || 0) * pb.quantity
-                      const price = parseFloat(prices?.[String(r.id)]) || 0
+                      const price = parseFloat(prices?.[String(r.id)]?.import) || 0
                       return (
                         <td key={r.id} className="num">
                           {amt ? Math.round(amt) : ''}
@@ -255,7 +255,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                   <td>₽</td>
                   <td></td>
                   {activeResources.map(r => {
-                    const price = parseFloat(prices?.[String(r.id)]) || 0
+                    const price = parseFloat(prices?.[String(r.id)]?.import) || 0
                     const rubleTotal = price > 0 ? totals[r.id] * price : null
                     return (
                       <td key={r.id} className="num" style={{ color: '#000080' }}>

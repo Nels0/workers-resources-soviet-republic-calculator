@@ -115,3 +115,47 @@ export function importProjectsAPI(projects) {
     body: JSON.stringify({ projects }),
   });
 }
+
+// Chain API
+
+export function fetchProjectChains(projectId) {
+  return fetchJSON(`/projects/${projectId}/chains`);
+}
+
+export function createProjectChainAPI(projectId, name) {
+  return fetchJSON(`/projects/${projectId}/chains`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function bulkReplaceProjectChainsAPI(projectId, chains) {
+  return fetchJSON(`/projects/${projectId}/chains`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chains }),
+  });
+}
+
+export function updateProjectChainAPI(projectId, chainId, name, position = undefined) {
+  const body = { name };
+  if (position !== undefined) body.position = position;
+  return fetchJSON(`/projects/${projectId}/chains/${chainId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteProjectChainAPI(projectId, chainId) {
+  return fetchJSON(`/projects/${projectId}/chains/${chainId}`, { method: 'DELETE' });
+}
+
+export function updateChainMembersAPI(projectId, chainId, positions) {
+  return fetchJSON(`/projects/${projectId}/chains/${chainId}/members`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ positions }),
+  });
+}

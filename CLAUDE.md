@@ -11,7 +11,7 @@ make backend          # Flask on :5000 only (hot-reloads on file change via --de
 make frontend         # Vite on :5173 only, proxies /api to :5000
 make reimport            # Reimport game data from known install path
 make import ARGS="--game-dir /path/to/wrsr"  # Import from custom path
-make migrate          # Run DB migration (uv run python backend/migrate_add_countries.py)
+make migrate          # Run all DB migrations (countries + chains)
 cd frontend && npm run lint
 cd frontend && npm run build
 cd frontend && npm run test         # Vitest unit tests (jsdom, fast)
@@ -140,6 +140,26 @@ cd backend && uv run pytest         # Backend tests
 - CostCalculator uses single column per resource: unit amount on top, ruble cost as navy sub-line (`#000080`, `0.85em`) when prices set. Footer `<tfoot>`: row 1 unit totals (grey), row 2 per-resource ruble totals (grey + navy, `—` for unpriced), row 3 grand total (colSpan label + value in last column)
 - `BuildingSearch` (in `CostCalculator.jsx`): always-visible `.win95-search-results` panel (200px) above the project table; shows first 10 matches as a `BuildingConstructionTable`; arrow keys navigate, Enter adds, Tab completes next word of highlighted result's name
 
+### Income Analysis (`components/IncomeAnalysis.jsx`)
+- Props: `{ projectId, projectBuildings, prices }` — fetches its own buildings/resources from API
+- **Section 1 — Resource Income table**: sparse columns per resource (produces or consumes); net flow per cell = `(produced − consumed) × qty`; positive black `↑`, negative red `↓`; ₽ Net column when any price is set; partial-price indicator `(+?)` with tooltip when some resources unpriced; footer Net row; omitted-buildings statusbar note when buildings have no flows
+- **Section 2 — Chain Builder**: groups buildings by shared resource relationships
+  - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
+  - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure
+  - Each chain: inline rename input (blur/Enter to commit), ▲/▼ reorder buttons (swap `position` values), `Dissolve` button; mini income table with move dropdown per row; status line summarising net flows + ₽
+  - Move dropdown excludes the building's own current chain from options
+  - Ungrouped groupbox shows buildings not in any chain; move dropdowns appear only when chains exist
+  - Deleting a building from the project (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)
+
+### Project Chains
+- `ProjectChain`: `{ id (UUID), project_id, name, position }` — display order within a project
+- `ProjectChainMember`: `{ chain_id, building_pos }` UNIQUE(chain_id, building_pos) — references `project_building.position`
+- `PUT /api/projects/<id>/chains/<chain_id>/members` auto-removes `building_pos` from other chains
+- `PUT /api/projects/<id>/chains` bulk-replaces all chains (used by auto-detect)
+- `PUT /api/projects/<id>/chains/<chain_id>` accepts optional `position` field for reordering
+- Migration: `backend/migrate_add_chains.py` — included in `make migrate`
+- Chain API functions in `frontend/src/api.js`: `fetchProjectChains`, `createProjectChainAPI`, `bulkReplaceProjectChainsAPI`, `updateProjectChainAPI`, `deleteProjectChainAPI`, `updateChainMembersAPI`
+
 ### Testing
 - **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx`
 - **Frontend browser:** Vitest browser mode + Playwright + Firefox. Loads `win95.css`, disables auto-cleanup (`RTL_SKIP_AUTO_CLEANUP`), 2s delay between tests for visual inspection. Setup: `src/browser-test-setup.js`
@@ -154,7 +174,7 @@ cd backend && uv run pytest         # Backend tests
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
   - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
-- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation Costs
+- **Planning** section: Projects (`/projects`) — tabbed Construction Costs / Operation (Operation Costs + Resource Income + Chain Builder)
 - **Resource Prices** panel: toggled by "Prices" button in taskbar; fixed right-side panel (`win95-side-panel`), available on all pages
 
 ### Data Models
@@ -172,6 +192,7 @@ cd backend && uv run pytest         # Backend tests
 
 ## Upcoming Work
 
+- **Merge Operation + Income tabs** — `plan3.md`; strip Resource Flows from `OperationCosts.jsx`, combine into single "Operation" tab in `ProjectView.jsx`
 - **Project import/export** — JSON download/upload for sharing projects
 - **Building detail enrichment** — storage capacity, vehicle compatibility (production flows already shown)
 - **Resource summary dashboard** — aggregate view across all projects

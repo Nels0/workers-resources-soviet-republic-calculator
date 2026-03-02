@@ -7,6 +7,7 @@ import {
 import { usePersistedState } from '../usePersistedState'
 import CostCalculator from './CostCalculator'
 import OperationCosts from './OperationCosts'
+import IncomeAnalysis from './IncomeAnalysis'
 
 function ProjectView({ countryId, prices = {} }) {
   const [projects, setProjects] = useState([])
@@ -281,6 +282,12 @@ function ProjectView({ countryId, prices = {} }) {
         >
           Operation Costs
         </button>
+        <button
+          className={`win95-tab${activeTab === 'income' ? ' active' : ''}`}
+          onClick={() => setActiveTab('income')}
+        >
+          Income
+        </button>
       </div>
 
       <div style={{ padding: 4 }}>
@@ -295,6 +302,13 @@ function ProjectView({ countryId, prices = {} }) {
         )}
         {activeTab === 'operation' && (
           <OperationCosts
+            projectBuildings={project?.buildings || []}
+            prices={prices}
+          />
+        )}
+        {activeTab === 'income' && (
+          <IncomeAnalysis
+            projectId={project?.id}
             projectBuildings={project?.buildings || []}
             prices={prices}
           />

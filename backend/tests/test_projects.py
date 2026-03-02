@@ -94,3 +94,39 @@ class TestCreateProject:
         names = [p["name"] for p in projects]
         assert "First" in names
         assert "Second" in names
+
+
+class TestChainGhostCleanup:
+    def test_deleting_building_removes_chain_member(self, client):
+        from app.database import get_session as gs
+        from app.models import Building
+
+        session = gs()
+        b = Building(name="Steel Mill", category="industry", source_file="steel.ini")
+        session.add(b)
+        session.commit()
+        bid = b.id
+        session.close()
+
+        pid = client.post("/api/projects", json={"name": "Test"}).get_json()["id"]
+        client.post(f"/api/projects/{pid}/buildings", json={"buildingId": bid})
+        pos = client.get(f"/api/projects/{pid}").get_json()["buildings"][0]["position"]
+
+        chain_id = client.post(
+            f"/api/projects/{pid}/chains", json={"name": "Steel Chain"}
+        ).get_json()["id"]
+        client.put(
+            f"/api/projects/{pid}/chains/{chain_id}/members",
+            json={"positions": [pos]},
+        )
+
+        # Verify member is present
+        chains = client.get(f"/api/projects/{pid}/chains").get_json()
+        assert pos in chains[0]["members"]
+
+        # Delete building
+        client.delete(f"/api/projects/{pid}/buildings/{pos}")
+
+        # Chain member should be cleaned up
+        chains = client.get(f"/api/projects/{pid}/chains").get_json()
+        assert chains[0]["members"] == []

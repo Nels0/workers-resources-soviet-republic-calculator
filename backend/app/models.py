@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
-from sqlalchemy import ForeignKey, Float, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Float, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -156,3 +157,33 @@ class ProjectBuilding(Base):
     position: Mapped[int] = mapped_column(default=0)
 
     project: Mapped["Project"] = relationship(back_populates="buildings")
+
+
+class ProjectChain(Base):
+    __tablename__ = "project_chains"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    name: Mapped[str] = mapped_column(String(200))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+    members: Mapped[list["ProjectChainMember"]] = relationship(
+        "ProjectChainMember", cascade="all, delete-orphan"
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "position": self.position,
+            "members": sorted([m.building_pos for m in self.members]),
+        }
+
+
+class ProjectChainMember(Base):
+    __tablename__ = "project_chain_members"
+    __table_args__ = (UniqueConstraint("chain_id", "building_pos"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    chain_id: Mapped[str] = mapped_column(ForeignKey("project_chains.id"))
+    building_pos: Mapped[int] = mapped_column(Integer)

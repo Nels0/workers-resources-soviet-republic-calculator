@@ -98,6 +98,37 @@ POST /api/projects/import
   Body: { projects: [{ id?, name, country_id?, buildings: [{ buildingId, quantity }] }] }
   Returns: [imported projects]
 
+## Project Chains
+
+GET /api/projects/<id>/chains
+  List chains for a project, ordered by position.
+  Returns: [{ id, name, position, members: [building_pos, ...] }]
+
+POST /api/projects/<id>/chains
+  Create a new chain.
+  Body: { name }
+  Returns: { id, name, position, members: [] }
+
+PUT /api/projects/<id>/chains
+  Bulk-replace all chains for a project (used by auto-detect).
+  Body: { chains: [{ name, members: [building_pos] }] }
+  Returns: [{ id, name, position, members }]
+
+PUT /api/projects/<id>/chains/<chain_id>
+  Rename a chain.
+  Body: { name }
+  Returns: updated chain
+
+DELETE /api/projects/<id>/chains/<chain_id>
+  Delete a chain (members become ungrouped).
+  Returns: { ok: true }
+
+PUT /api/projects/<id>/chains/<chain_id>/members
+  Bulk-replace the member list for a chain.
+  Automatically removes these positions from any other chain in the project.
+  Body: { positions: [int] }
+  Returns: updated chain
+
 ## Health
 
 GET /api/health

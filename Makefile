@@ -20,3 +20,4 @@ reimport:
 
 migrate:
 	uv run python backend/migrate_add_countries.py
+	uv run python backend/migrate_add_chains.py

@@ -294,7 +294,8 @@ body {
 
 .win95-table td.num {
   text-align: right;
-  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
 }
 
 .win95-table a {

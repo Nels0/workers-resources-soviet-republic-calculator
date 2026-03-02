@@ -217,10 +217,10 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                       const price = parseFloat(prices?.[String(r.id)]) || 0
                       return (
                         <td key={r.id} className="num">
-                          {amt ? Math.round(amt * 100) / 100 : ''}
+                          {amt ? Math.round(amt) : ''}
                           {hasAnyPrice && (
                             <div style={{ color: '#000080', fontSize: '0.85em' }}>
-                              {price > 0 && amt > 0 ? Math.round(amt * price * 100) / 100 : '—'}
+                              {price > 0 && amt > 0 ? Math.round(amt * price) : '—'}
                             </div>
                           )}
                         </td>
@@ -228,7 +228,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                     })}
                     {hasAnyPrice && (
                       <td className="num" style={{ color: '#000080', fontWeight: 'bold' }}>
-                        {rowRubleTotal > 0 ? Math.round(rowRubleTotal * 100) / 100 : '—'}
+                        {rowRubleTotal > 0 ? Math.round(rowRubleTotal) : '—'}
                       </td>
                     )}
                     <td>
@@ -244,7 +244,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                 <td></td>
                 {activeResources.map(r => (
                   <td key={r.id} className="num">
-                    {totals[r.id] ? Math.round(totals[r.id] * 100) / 100 : ''}
+                    {totals[r.id] ? Math.round(totals[r.id]) : ''}
                   </td>
                 ))}
                 {hasAnyPrice && <td></td>}
@@ -259,7 +259,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                     const rubleTotal = price > 0 ? totals[r.id] * price : null
                     return (
                       <td key={r.id} className="num" style={{ color: '#000080' }}>
-                        {rubleTotal != null ? Math.round(rubleTotal * 100) / 100 : '—'}
+                        {rubleTotal != null ? Math.round(rubleTotal) : '—'}
                       </td>
                     )
                   })}
@@ -270,7 +270,7 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
               {hasAnyPrice && (
                 <tr style={{ fontWeight: 'bold' }}>
                   <td colSpan={2 + activeResources.length}>Total ₽</td>
-                  <td className="num">{totalCost ? Math.round(totalCost * 100) / 100 : ''}</td>
+                  <td className="num">{totalCost ? Math.round(totalCost) : ''}</td>
                   <td></td>
                 </tr>
               )}

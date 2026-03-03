@@ -196,7 +196,7 @@ cd backend && uv run pytest         # Backend tests
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
   - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
-- **Planning** section: Projects (`/projects`) — two tabs: **Construction Costs** / **Operation** (Resource Income + Chain Builder)
+- **Planning** section: Projects (`/projects`) — two tabs: **Construction** / **Operation** (Resource Income + Chain Builder)
 - **Resource Prices** panel: toggled by "Prices" button in taskbar; draggable + resizable floating panel, available on all pages
 
 ### Data Models

@@ -239,7 +239,7 @@ describe('Gap 7: move dropdown excludes current chain', () => {
     const select = screen.getByTitle('Move to chain')
     const optionTexts = Array.from(select.options).map(o => o.text)
     expect(optionTexts).not.toContain('Steel')
-    expect(optionTexts).toContain('Ungrouped')
+    expect(optionTexts).toContain('-')
   })
 })
 

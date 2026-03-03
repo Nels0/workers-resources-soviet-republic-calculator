@@ -237,11 +237,11 @@ describe('ProjectView tab structure', () => {
     mockStorage.loadProjects.mockResolvedValue([project])
   })
 
-  it('shows Construction Costs and Operation tabs, no Income tab', async () => {
+  it('shows Construction and Operation tabs, no Income tab', async () => {
     renderProjectView()
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Construction Costs' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Construction' })).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Operation' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Income' })).not.toBeInTheDocument()

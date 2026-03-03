@@ -79,11 +79,24 @@ cd backend && uv run pytest         # Backend tests
 ### Table Design
 - Tables only render columns for resources/data that have ≥1 non-zero value (sparse columns) — reduces noise
 - Sticky headers on all scrollable tables; sort arrows (`▲`/`▼`) on sortable columns
-- Alternating row colors (`#ffffff` / `#f0f0f0`); hover inverts to `#808080` background with white text
-- Selected rows use the same navy blue as hover for visual consistency
+- Alternating row colors (`#ffffff` / `#f0f0f0`); hover tint `#dde4f0`; selected tint `#b8cce8` — no `color: white` override so colored text (navy values, red negatives) stays readable
 - Footer `<tfoot>` rows for totals; never inline sums in the last data row
 - Numeric cells are right-aligned with tabular figures (`font-variant-numeric: tabular-nums`)
 - Building names always show `source_file` alongside in smaller muted text to disambiguate duplicates
+
+### Stable Table Columns (preventing reflow/flicker)
+Two strategies depending on context:
+
+**Full-width tables** (`flex: 1` item, e.g. `ResourceFlowsTable`): use `table-layout: fixed; width: 100%` on `<table>`, explicit `width` on every `<th>` except the variable column (Building), which absorbs the remainder. `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` on variable-length text cells.
+- Building: auto (remaining), Move: `5em`, Qty: `4em`, Staffing: `220px`, resource columns: `8em`, ₽ Net: `9em`
+- `width: 100%` works here because `flex: 1` gives the item a **definite width** from the flex algorithm
+
+**Side-panel tables** (`flex: 0 0 auto` item, e.g. `ChainEconomicsPanel`): use `table-layout: fixed; width: auto` on `<table>`, explicit `width` on **every** `<th>`. The inline `width: auto` overrides `.win95-table { width: 100% }` (inline beats class). With all columns having explicit widths, CSS spec defines the table width as exactly their sum — fully stable.
+- Why `width: 100%` fails here: `flex: 0 0 auto` has no definite width; the percentage walks up the DOM to the flex container (full page width). `width: auto` breaks this chain.
+- **Never** use `min-width` alone — it prevents shrinkage but allows growth when year-view values are 365× larger than day-view values
+- **Never** use block-level children (`<div>`) inside `<th>` — causes extra layout recalculation; use inline `<span>` instead
+
+**Unit headers** (period/normalize): render the unit inside the header as inline text. Use `visibility: hidden` (not `display: none`) on the `/w` normalize suffix so it always occupies space: `{base}/{char}<span style={{visibility: normalizeView ? 'visible' : 'hidden'}}>/w</span>`. Compact period codes: `D/W/M/Y` from `PERIODS[period].char`; no brackets: `t/M` not `(t/mo)`.
 
 ### Keyboard Navigation
 - Search interfaces must be fully operable without a mouse: ↑↓ to navigate results, Enter to confirm, Tab to word-complete
@@ -104,7 +117,7 @@ cd backend && uv run pytest         # Backend tests
 - `.debt-calc-amount` — right-aligned tabular-nums cell for loan calculator results
 - `.win95-combobox` / `.win95-combobox-display` / `.win95-combobox-arrow` / `.win95-combobox-list` / `.win95-combobox-option` — custom combo box styles
 - `.win95-search-results` — always-visible in-flow fixed-height (200px) panel with inset border; uses `border-collapse: separate; border-spacing: 0` scoped override to fix Firefox sticky-header bug inside `overflow-y: auto` containers
-- `.win95-table tr.selected td` — keyboard-selection highlight (same blue as hover); `.win95-table tr.selected .win95-muted` — light blue so source_file remains readable
+- `.win95-table tbody tr:hover` → `#dde4f0` tint; `.win95-table tr.selected td` → `#b8cce8` tint — no `color: white`, all text colors remain readable on hover/select
 - Building names display `source_file` alongside (smaller, greyed out via `win95-muted`) to disambiguate duplicates
 - Never use Bootstrap or other CSS frameworks
 
@@ -160,23 +173,23 @@ cd backend && uv run pytest         # Backend tests
 
 ### Income Analysis (`components/income/IncomeAnalysis.jsx`)
 Refactored into `components/income/` directory + two hooks:
-- **`hooks/useProductivity.js`**: `useProductivity(projectId, projectBuildings)` — manages `buildingProductivityOverrides`, debounced DB saves, and `getNetFlow(b, pb, r, { applyProductivity, applyNormalize, period })`. Also exports `PERIODS` constant. No project-wide productivity state.
+- **`hooks/useProductivity.js`**: `useProductivity(projectId, projectBuildings)` — manages `buildingProductivityOverrides`, debounced DB saves, and `getNetFlow(b, pb, r, { applyProductivity, applyNormalize, period })`. Exports `PERIODS` constant (each entry has `label`, `suffix`, `char` (`D/W/M/Y`), `materialFactor`, `elecFactor`). No project-wide productivity state.
 - **`hooks/useChains.js`**: `useChains(projectId)` — manages chain state + API calls; `autoDetectChains()` calls backend `POST /chains/auto-detect` → applies result via `bulkReplaceProjectChainsAPI`.
 - **`components/income/IncomeAnalysis.jsx`** (orchestrator): uses both hooks; renders toolbar + "Resource Flows" groupbox + `ChainBuilder`.
-- **`components/income/ResourceFlowsTable.jsx`**: per-building resource flow table with `BlockSlider` productivity controls. `showRubles` prop (default `true`) — when `false` hides the `₽ Net` column entirely (used by chain panels).
-- **`components/income/ChainBuilder.jsx`**: chain list + auto-detect confirm dialog + ungrouped section. Module-level `ChainCard` sub-component manages its own `useEffect` to fetch chain economics from backend (keyed on members, period, overrides, normalizeView).
-- **`components/income/ChainEconomicsPanel.jsx`**: purely presentational; receives `economics` from backend API, computes ₽ totals locally using `prices` + `included`; shows `(+?)` muted indicator per-row and in Net ₽ statusbar when any included resource lacks a price.
+- **`components/income/ResourceFlowsTable.jsx`**: per-building resource flow table. `showRubles` prop (default `true`) — when `false` hides the `₽ Net` column (used by chain panels). `showProductivityOverride` adds a dedicated `Staffing` column with `BlockSlider` (moved out of the building name cell). Uses `table-layout: fixed; width: 100%` for stable column widths.
+- **`components/income/ChainBuilder.jsx`**: chain list + auto-detect confirm dialog + ungrouped section. `ChainBuilder` uses `.win95-toolbar` for action buttons with saving/error status on the right. Module-level `ChainCard`: title = name input only; `.win95-toolbar` row below with `☐ Prod.` on left + ▲▼ + Dissolve on right; side-by-side layout (flows table left, economics panel right, `alignItems: 'stretch'`).
+- **`components/income/ChainEconomicsPanel.jsx`**: wrapped in `win95-groupbox` titled "Chain Economics". Statusbar shows Import/Export/Net ₽ + `₽+N/w/M` (net per effective worker). Uses `table-layout: fixed; width: auto` (see Stable Table Columns) with explicit `width` on all columns. `ChainCard` initializes `economicsLoading=true` for non-empty chains and shows stale economics while re-fetching (avoids layout flicker).
 
 Key behaviours:
 - **Toolbar**: Period buttons (Day/Week/Month/Year) | `☐ Normalize/worker` checkbox (no project-wide productivity input)
 - **Productivity = staffing level**: per-building slider represents fraction of workers employed (0–100%). In `getNetFlow`, productivity is **not** applied when `applyNormalize=true` — each active worker produces at full rated rate regardless of headcount, so normalize shows intrinsic per-worker efficiency. Backend `chain-economics` always applies the productivity factor (staffing affects total throughput and chain constraint propagation regardless of normalize mode); normalize only controls `norm_factor` (÷ `workers_needed`).
 - **`BlockSlider`** (`components/BlockSlider.jsx`): `min=0 max=1 step=0.01`; 10 blocks of 10% each with 1%-precision partial fill; label navy+bold if `hasOverride`, muted otherwise; `×` clear button when overriding. Fallback when no override: `1.0`.
-- **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed`; column headers show `/worker/` infix (e.g. `t/worker/mo`)
+- **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed`; column headers show `/w` suffix using `visibility: hidden` trick (e.g. `t/M` → `t/M/w`)
 - **Period selector**: Raw `.ini` values are per-worker per-game-day (materials) or MW continuous (electricity). `PERIODS` constant: `materialFactor` = game-days in period (1/7/30.44/365.24); `elecFactor` = game-days × 120 real-hours/game-day (1 game-day = 5 real days = 120 real hours). `getNetFlow` multiplies material flows by `b.workers_needed`; electricity uses `elecFactor` directly. In normalize mode the `×workers_needed` cancels the `/workers_needed` division.
-- **Resource Flows table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `BlockSlider`; Qty editable `<input>` (calls `onUpdateQty`); building name is `.win95-link-btn` (calls `onBuildingClick`)
-- **Chain Builder**: `Auto-detect chains` calls backend endpoint (union-find on server); confirmation dialog if chains exist; `savingChains` disables all three buttons
-  - Each chain: inline rename, `☐ Prod.` checkbox only (localStorage `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building table (`showRubles={false}`) + chain economics panel
-  - Chain economics panel: Produced / Consumed / Net + "Internal %" (coverage) table with per-resource ☐ inclusion; `(+?)` per unpriced row and in statusbar Net ₽; "Idle capacity" section (building name + qty, bottleneck resource). Pass `chainPbs` + `buildingMap` from ChainCard for name lookup.
+- **Resource Flows table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; dedicated `Staffing` column with `BlockSlider` (when `showProductivityOverride`); Qty editable `<input>`; building name is `.win95-link-btn`
+- **Chain Builder**: `.win95-toolbar` with Auto-detect / Clear / New chain buttons; saving/error status right-aligned in toolbar. Confirmation dialog if chains exist before auto-detect.
+  - Each chain (`ChainCard`): groupbox title = name input; toolbar row = `☐ Prod.` + spacer + ▲▼ + Dissolve; per-building table (`showRubles={false}`) left + economics panel right (`alignItems: 'stretch'`)
+  - Chain economics panel: "Chain Economics" groupbox; Produced / Consumed / Net + "Internal %" table with per-resource ☐ inclusion; `(+?)` per unpriced row; "Idle capacity" section; statusbar shows Import/Export/Net ₽ + `₽+N/w/M` (per effective worker)
   - Chain economics computed via **backend endpoint** `POST /api/projects/<id>/chain-economics` (iterative constraint propagation, max 20 passes); `ChainCard` fetches on members/period/overrides/normalizeView change
   - Move dropdown excludes building's own chain; ungrouped groupbox shows unchained buildings
   - Deleting a building (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)

@@ -100,6 +100,8 @@ cd backend && uv run pytest         # Backend tests
 - `.win95-draggable-window` — `position:fixed`, `box-shadow: 4px 4px 0 #000`; titlebar gets `cursor:grab`/`grabbing` via `.dragging` class
 - `.win95-resize-s` — 5px south resize handle with dotted grip; `cursor:ns-resize`; add to any vertically resizable panel/window
 - `.win95-link-btn` — borderless button styled as a navy underlined link; used for building name cells that open the info popup instead of navigating
+- `.win95-block-slider` / `.win95-block-slider-block` / `.win95-block-slider-block.filled` — generic 10-block fill widget (navy filled, gray empty); used by `BlockSlider` in `DebtCalculator`
+- `.debt-calc-amount` — right-aligned tabular-nums cell for loan calculator results
 - `.win95-combobox` / `.win95-combobox-display` / `.win95-combobox-arrow` / `.win95-combobox-list` / `.win95-combobox-option` — custom combo box styles
 - `.win95-search-results` — always-visible in-flow fixed-height (200px) panel with inset border; uses `border-collapse: separate; border-spacing: 0` scoped override to fix Firefox sticky-header bug inside `overflow-y: auto` containers
 - `.win95-table tr.selected td` — keyboard-selection highlight (same blue as hover); `.win95-table tr.selected .win95-muted` — light blue so source_file remains readable
@@ -114,6 +116,9 @@ cd backend && uv run pytest         # Backend tests
 - `BuildingConstructionTable` (`components/BuildingConstructionTable.jsx`) — shared Name + Category + sparse resource cost table. Sort mode (`onSort` prop): sortable headers, name cells are Links or `.win95-link-btn` buttons (when `onBuildingClick` provided). Select mode (`onSelect` prop): static headers, clickable rows. Used by `BuildingList` (sort mode) and `BuildingSearch` in `CostCalculator` (select mode).
 - `BuildingInfoWindow` (`components/BuildingInfoWindow.jsx`) — draggable, vertically resizable floating popup; props `{ buildingId, onClose }`; fetches `GET /api/buildings/:id`; renders same content as `BuildingDetail`; titlebar drag via `mousemove`/`mouseup` on document; bottom `.win95-resize-s` handle. `App.jsx` owns `openBuildingId` state; passes `onBuildingClick={setOpenBuildingId}` to `BuildingList` and `ProjectView`; `ProjectView` threads it to `CostCalculator` and `IncomeAnalysis`.
 - `WinComboBox` (`components/WinComboBox.jsx`) — custom Win95 combo box; props `{ items:[{id,label}], selectedId, onSelect, onRename, placeholder }`; single-click opens dropdown, double-click on display enters inline rename (input replaces label); Enter/blur commits rename, Escape cancels; click-outside closes. Used by `CountrySelector` (with `onRenameCountry` → `PUT /api/countries/<id>`) and `ProjectView` project picker (with `handleRenameProject` → `updateProjectAPI`).
+- `DebtCalculator` (`components/DebtCalculator.jsx`) — floating Win95 loan calculator; toggled by "Loan" button in taskbar; `App.jsx` owns `showDebtCalc` state. Props: `{ onClose }`. State: `principal` (₽), `rateIdx` (0–10 → 0–5% in 0.5% steps), `termIdx` (0–10 → 0–5yr in 0.5yr steps). Uses `BlockSlider` (module-level) for rate/term. Position persisted to `localStorage('debt-calc-pos')`. Computes fixed-rate annuity; shows `—` when principal=0 or term=0. Results ordered Daily → Weekly → Monthly → Annual.
+- `BlockSlider` (module-level in `DebtCalculator.jsx`) — generic block-fill slider; props `{ steps, value, onChange, label }`; `value` is step index (0..steps); `label(v)` formats the display string; click-and-drag like `ProductivitySlider`
+- `useDraggable` (`hooks/useDraggable.js`) — reusable drag hook; `useDraggable(initialPos)` → `{ pos, setPos, onMouseDown, isDragging }`; attach `onMouseDown` to titlebar; `initialPos` can be a lazy initializer function
 
 ### Backend
 - Flask blueprints in `app/routes/`, factory in `app/__init__.py`
@@ -190,6 +195,12 @@ cd backend && uv run pytest         # Backend tests
 - For debounce testing: use real timers with `userEvent.setup({ delay: null })` + `waitFor(..., { timeout: 2000 })` — avoid `vi.useFakeTimers()` before render as it blocks `waitFor` polling
 - Always-visible panels (like `.win95-search-results`) duplicate text that also appears in other parts of the page — use `getAllByText` instead of `getByText` for building names/source_files; guard `scrollIntoView` with `?.scrollIntoView` since jsdom doesn't implement it
 
+### ESLint / react-hooks v7
+Project uses `eslint-plugin-react-hooks` v7 which adds many new rules beyond classic `rules-of-hooks`/`exhaustive-deps`. Key patterns required:
+- **No setState in effect bodies** (`react-hooks/set-state-in-effect`): for prop→state sync, use "set during render" (`if (prev !== current) { setPrev(current); setState(newVal) }`); for early-return setState, convert to a fully async chain with `Promise.resolve()`
+- **No ref writes during render** (`react-hooks/refs`): move `ref.current = value` into a `useEffect(() => { ref.current = value }, [value])`; place the effect *after* the variable's declaration (can't forward-reference)
+- **Missing deps with async effects** (`react-hooks/exhaustive-deps`): to read state inside an async effect without triggering re-runs, use a ref (`const xRef = useRef(x); useEffect(() => { xRef.current = x }, [x])`) and read `xRef.current` in the async callback; stable setters (`useState` setters) can safely be added to deps without causing extra renders
+
 ## Architecture
 
 ### Navigation
@@ -198,6 +209,7 @@ cd backend && uv run pytest         # Backend tests
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
 - **Planning** section: Projects (`/projects`) — two tabs: **Construction** / **Operation** (Resource Income + Chain Builder)
 - **Resource Prices** panel: toggled by "Prices" button in taskbar; draggable + resizable floating panel, available on all pages
+- **Loan Calculator** panel: toggled by "Loan" button in taskbar (after Prices); `DebtCalculator` component; position persisted in localStorage
 
 ### Data Models
 - `Building` → `BuildingCost` (phase: construction/operation) + `BuildingFlow` (direction: produces/consumes)

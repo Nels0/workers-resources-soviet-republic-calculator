@@ -6,6 +6,7 @@ import BuildingInfoWindow from './components/BuildingInfoWindow'
 import ProjectView from './components/ProjectView'
 import CountrySelector from './components/CountrySelector'
 import ResourcePrices from './components/ResourcePrices'
+import DebtCalculator from './components/DebtCalculator'
 import { fetchCountries, createCountryAPI, deleteCountryAPI, updateCountryAPI, fetchCountryPrices, updateCountryPricesAPI } from './api'
 import './win95.css'
 
@@ -15,6 +16,7 @@ function App() {
   const [selectedCountryId, setSelectedCountryId] = useState(null)
   const [countryPrices, setCountryPrices] = useState({})
   const [showPricesPanel, setShowPricesPanel] = useState(false)
+  const [showDebtCalc, setShowDebtCalc] = useState(false)
   const [showCountryCreateDialog, setShowCountryCreateDialog] = useState(false)
   const [showCountryDeleteDialog, setShowCountryDeleteDialog] = useState(false)
   const [newCountryName, setNewCountryName] = useState('')
@@ -254,6 +256,12 @@ function App() {
         >
           Prices
         </button>
+        <button
+          className={`win95-nav-btn${showDebtCalc ? ' active' : ''}`}
+          onClick={() => setShowDebtCalc(v => !v)}
+        >
+          Loan
+        </button>
       </div>
 
       {countryError && (
@@ -290,6 +298,10 @@ function App() {
           buildingId={openBuildingId}
           onClose={() => setOpenBuildingId(null)}
         />
+      )}
+
+      {showDebtCalc && (
+        <DebtCalculator onClose={() => setShowDebtCalc(false)} />
       )}
 
       {showPricesPanel && (

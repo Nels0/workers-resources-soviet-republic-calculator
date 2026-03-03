@@ -13,6 +13,8 @@ import WinComboBox from './WinComboBox'
 function ProjectView({ countryId, prices = {}, onBuildingClick }) {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = usePersistedState('wrsr:selectedProjectId', null)
+  const selectedIdRef = useRef(selectedId)
+  useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   const [activeTab, setActiveTab] = useState('construction')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -43,13 +45,13 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
         // migration is best-effort
       }
       const data = await refresh()
-      if (data.length > 0 && !data.find(p => p.id === selectedId)) {
+      if (data.length > 0 && !data.find(p => p.id === selectedIdRef.current)) {
         setSelectedId(data[0].id)
       }
       setLoading(false)
     }
     init()
-  }, [countryId, refresh])
+  }, [countryId, refresh, setSelectedId])
 
   useEffect(() => {
     if (showCreateDialog && nameInputRef.current) {

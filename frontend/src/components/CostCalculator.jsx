@@ -6,7 +6,14 @@ import BuildingConstructionTable from './BuildingConstructionTable'
 function BuildingSearch({ buildings, resources, onAdd }) {
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [prevQuery, setPrevQuery] = useState(query)
   const tbodyRef = useRef(null)
+
+  // Reset selection when query changes (set-during-render avoids an extra effect render)
+  if (prevQuery !== query) {
+    setPrevQuery(query)
+    setSelectedIndex(0)
+  }
 
   const filtered = useMemo(() => {
     const arr = query
@@ -17,11 +24,6 @@ function BuildingSearch({ buildings, resources, onAdd }) {
       : buildings
     return arr.slice(0, 10)
   }, [query, buildings])
-
-  // Reset selection when query changes
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [query])
 
   // Scroll selected row into view on keyboard navigation
   useEffect(() => {

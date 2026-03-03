@@ -714,3 +714,33 @@ body {
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* Block slider (generalised Win95 block-fill widget) */
+
+.win95-block-slider {
+  display: inline-flex;
+  gap: 1px;
+  padding: 2px;
+  cursor: ew-resize;
+  user-select: none;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff;
+  background: #ffffff;
+}
+
+.win95-block-slider-block {
+  width: 14px;
+  height: 14px;
+  background: #c0c0c0;
+}
+
+.win95-block-slider-block.filled {
+  background: #000080;
+}
+
+/* Debt calculator */
+
+.debt-calc-amount {
+  padding: 2px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

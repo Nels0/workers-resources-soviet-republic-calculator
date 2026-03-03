@@ -7,8 +7,16 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
   const [projectBuildings, setProjectBuildings] = useState([])
-  const [localPrices, setLocalPrices] = useState({})
+  const [localPrices, setLocalPrices] = useState(prices || {})
+  const [prevPrices, setPrevPrices] = useState(prices)
   const [savedFlash, setSavedFlash] = useState(false)
+
+  // Sync localPrices when the prices prop changes (country switch)
+  // Uses set-during-render instead of an effect to avoid an extra render pass
+  if (prevPrices !== prices) {
+    setPrevPrices(prices)
+    setLocalPrices(prices || {})
+  }
 
   const saveTimeoutRef = useRef(null)
   const flashTimeoutRef = useRef(null)
@@ -17,6 +25,7 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
   const usedResourcesRef = useRef([])
   const onUpdatePricesRef = useRef(onUpdatePrices)
   useEffect(() => { onUpdatePricesRef.current = onUpdatePrices }, [onUpdatePrices])
+  useEffect(() => { localPricesRef.current = localPrices }, [localPrices])
 
   useEffect(() => {
     fetchBuildingsList()
@@ -30,19 +39,13 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
 
   // Fetch projects for this country to derive which resources are used
   useEffect(() => {
-    if (!countryId) {
-      setProjectBuildings([])
-      return
-    }
-    loadProjects(countryId)
-      .then(projects => setProjectBuildings(projects.flatMap(p => p.buildings)))
+    const fetcher = countryId
+      ? loadProjects(countryId).then(projects => projects.flatMap(p => p.buildings))
+      : Promise.resolve([])
+    fetcher
+      .then(setProjectBuildings)
       .catch(() => setProjectBuildings([]))
   }, [countryId])
-
-  // Sync local prices from prop (country switch or initial load)
-  useEffect(() => {
-    setLocalPrices(prices || {})
-  }, [prices])
 
   const buildingMap = useMemo(() => {
     const map = {}
@@ -62,10 +65,7 @@ function ResourcePrices({ countryId, prices, onUpdatePrices }) {
       })
     )
   }, [resources, projectBuildings, buildingMap])
-
-  // Keep refs in sync so the debounce callback always uses latest values
-  localPricesRef.current = localPrices
-  usedResourcesRef.current = usedResources
+  useEffect(() => { usedResourcesRef.current = usedResources }, [usedResources])
 
   function handlePriceChange(resourceId, field, value) {
     setLocalPrices(prev => ({

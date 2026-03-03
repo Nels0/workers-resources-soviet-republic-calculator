@@ -728,13 +728,12 @@ body {
 }
 
 .win95-block-slider-block {
+  position: relative;
+  overflow: hidden;
   width: 14px;
   height: 14px;
   background: #c0c0c0;
-}
-
-.win95-block-slider-block.filled {
-  background: #000080;
+  flex-shrink: 0;
 }
 
 /* Debt calculator */

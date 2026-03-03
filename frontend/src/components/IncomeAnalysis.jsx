@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import BlockSlider from './BlockSlider'
 import {
   fetchBuildingsList,
   fetchProjectChains,
@@ -11,90 +12,6 @@ import {
   updateBuildingProductivityAPI,
 } from '../api'
 
-// Win95-styled 10-block productivity slider (0–100%, snap to 10%)
-function ProductivitySlider({ value, onChange, hasOverride, onClear }) {
-  const containerRef = useRef(null)
-  const isDragging = useRef(false)
-  const onChangeRef = useRef(onChange)
-  useEffect(() => { onChangeRef.current = onChange })
-
-  useEffect(() => {
-    function getVal(clientX) {
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (!rect) return 0
-      const fraction = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width))
-      return fraction
-    }
-    function onMove(e) {
-      if (!isDragging.current) return
-      onChangeRef.current(getVal(e.clientX))
-    }
-    function onUp() { isDragging.current = false }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    return () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-  }, [])
-
-  function handleMouseDown(e) {
-    isDragging.current = true
-    const rect = containerRef.current.getBoundingClientRect()
-    const fraction = Math.max(0, Math.min(0.999, (e.clientX - rect.left) / rect.width))
-    onChangeRef.current(Math.round(fraction * 10) / 10)
-    e.preventDefault()
-  }
-
-  const filledBlocks = Math.round(value * 10)
-
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-      <div
-        ref={containerRef}
-        onMouseDown={handleMouseDown}
-        title={`Productivity: ${Math.round(value * 100)}% — drag to adjust`}
-        style={{
-          display: 'flex',
-          gap: 1,
-          padding: 2,
-          cursor: 'ew-resize',
-          userSelect: 'none',
-          boxShadow: 'inset 1px 1px #808080, inset -1px -1px #ffffff',
-          background: '#ffffff',
-        }}
-      >
-        {Array.from({ length: 10 }, (_, i) => (
-          <div
-            key={i}
-            style={{
-              width: 11,
-              height: 11,
-              background: i < filledBlocks ? '#000080' : '#c0c0c0',
-              flexShrink: 0,
-            }}
-          />
-        ))}
-      </div>
-      <span style={{
-        fontSize: '0.8em',
-        minWidth: 26,
-        color: hasOverride ? '#000080' : '#808080',
-        fontWeight: hasOverride ? 'bold' : undefined,
-      }}>
-        {Math.round(value * 100)}%
-      </span>
-      {hasOverride && (
-        <button
-          className="win95-btn"
-          style={{ fontSize: '0.75em', padding: '0 3px' }}
-          onClick={onClear}
-          title="Clear override — revert to project default"
-        >×</button>
-      )}
-    </div>
-  )
-}
 
 const PERIODS = {
   day:   { label: 'Day',   suffix: '/day', materialFactor: 5,                   elecFactor: 24 },
@@ -439,9 +356,11 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
                     {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
                     {showProductivityOverride && (
                       <div style={{ marginTop: 2 }}>
-                        <ProductivitySlider
+                        <BlockSlider
+                          min={0} max={1} step={0.01}
                           value={Math.min(1, buildingProductivityOverrides[pb.position] ?? projectProductivity)}
                           onChange={factor => handleBuildingProductivityChange(pb.position, factor)}
+                          label={v => `${Math.round(v * 100)}%`}
                           hasOverride={hasOverride}
                           onClear={() => handleBuildingProductivityClear(pb.position)}
                         />

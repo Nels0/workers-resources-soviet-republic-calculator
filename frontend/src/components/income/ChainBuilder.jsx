@@ -13,7 +13,7 @@ function ChainCard({
   onBuildingProductivityChange, onBuildingProductivityClear, onToggleFactor,
 }) {
   const [economics, setEconomics] = useState(null)
-  const [economicsLoading, setEconomicsLoading] = useState(false)
+  const [economicsLoading, setEconomicsLoading] = useState(chain.members.length > 0)
 
   const membersKey = [...chain.members].sort().join(',')
   const effProductivity = 1.0
@@ -94,9 +94,8 @@ function ChainCard({
           />
         </div>
         <div style={{ flex: '0 0 auto' }}>
-          {economicsLoading
-            ? <div className="win95-statusbar">Computing…</div>
-            : (
+          {economics
+            ? (
               <ChainEconomicsPanel
                 economics={economics}
                 period={period}
@@ -108,6 +107,9 @@ function ChainCard({
                 buildingProductivityOverrides={relevantOverrides}
               />
             )
+            : economicsLoading
+              ? <div className="win95-statusbar">Computing…</div>
+              : null
           }
         </div>
       </div>

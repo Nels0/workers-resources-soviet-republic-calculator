@@ -104,11 +104,11 @@ describe('BuildingList tab switching', () => {
 
     const constructionTab = screen.getByRole('button', { name: 'Construction' })
     expect(constructionTab.className).toContain('active')
-    const productionTab = screen.getByRole('button', { name: 'Production' })
+    const productionTab = screen.getByRole('button', { name: 'Resource Flows' })
     expect(productionTab.className).not.toContain('active')
   })
 
-  it('clicking Production tab shows only buildings with flow data', async () => {
+  it('clicking Resource Flows tab shows only buildings with flow data', async () => {
     const user = userEvent.setup()
     renderBuildingList()
 
@@ -116,7 +116,7 @@ describe('BuildingList tab switching', () => {
       expect(screen.getByText('hospital.ini')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
 
     // Cement plant has flows, hospitals do not
     await waitFor(() => {
@@ -139,7 +139,7 @@ describe('BuildingList tab switching', () => {
     await user.selectOptions(materialSelect, '1')
 
     // Switch to Production and back
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
     await user.click(screen.getByRole('button', { name: 'Construction' }))
 
     // Material filter should be reset — all buildings visible again
@@ -170,7 +170,7 @@ describe('BuildingList column sparseness', () => {
     expect(screen.queryAllByText('Coal (t)').length).toBe(0)
   })
 
-  it('Production tab shows only columns with flow data', async () => {
+  it('Resource Flows tab shows only columns with flow data', async () => {
     const user = userEvent.setup()
     renderBuildingList()
 
@@ -178,7 +178,7 @@ describe('BuildingList column sparseness', () => {
       expect(screen.getByText('hospital.ini')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
 
     await waitFor(() => {
       expect(screen.getByText('cement_plant.ini')).toBeInTheDocument()
@@ -234,7 +234,7 @@ describe('BuildingList production tab', () => {
       expect(screen.getByText('hospital.ini')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
 
     await waitFor(() => {
       expect(screen.getByText('No buildings have production or consumption data.')).toBeInTheDocument()
@@ -249,7 +249,7 @@ describe('BuildingList production tab', () => {
       expect(screen.getByText('hospital.ini')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
 
     await waitFor(() => {
       expect(screen.getByText('cement_plant.ini')).toBeInTheDocument()
@@ -270,7 +270,7 @@ describe('BuildingList production tab', () => {
       expect(screen.getByText('hospital.ini')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Production' }))
+    await user.click(screen.getByRole('button', { name: 'Resource Flows' }))
 
     await waitFor(() => {
       expect(screen.getByText('cement_plant.ini')).toBeInTheDocument()

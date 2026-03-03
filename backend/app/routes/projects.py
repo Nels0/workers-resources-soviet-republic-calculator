@@ -4,7 +4,17 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import func, delete as sql_delete
 
 from ..database import get_session
-from ..models import Project, ProjectBuilding, ProjectChain, ProjectChainMember
+from ..models import (
+    Project, ProjectBuilding, ProjectChain, ProjectChainMember,
+    Building, Resource, CountryResourcePrice,
+)
+
+PERIODS = {
+    "day":   {"material": 5,                    "elec": 24},
+    "week":  {"material": 5 * 7,                "elec": 24 * 7},
+    "month": {"material": 5 * 365.2425 / 12,    "elec": 24 * 365.2425 / 12},
+    "year":  {"material": 5 * 365.2425,          "elec": 24 * 365.2425},
+}
 
 bp = Blueprint("projects", __name__)
 
@@ -362,5 +372,270 @@ def update_chain_members(project_id, chain_id):
 
         session.commit()
         return jsonify(chain.to_dict())
+    finally:
+        session.close()
+
+
+# --- Chain analysis routes ---
+
+@bp.route("/api/projects/<project_id>/chains/auto-detect", methods=["POST"])
+def auto_detect_chains(project_id):
+    """Suggest chain groupings based on shared resource flows. Does NOT save."""
+    session = get_session()
+    try:
+        project = session.get(Project, project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        if not project.buildings:
+            return jsonify({"chains": []})
+
+        building_ids = [pb.building_id for pb in project.buildings]
+        buildings = session.query(Building).filter(Building.id.in_(building_ids)).all()
+        building_map = {b.id: b for b in buildings}
+
+        # Filter to project buildings with flow data
+        flow_pbs = [
+            pb for pb in project.buildings
+            if building_map.get(pb.building_id) and building_map[pb.building_id].flows
+        ]
+        if not flow_pbs:
+            return jsonify({"chains": []})
+
+        # Union-find over positions
+        parent = {pb.position: pb.position for pb in flow_pbs}
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(x, y):
+            parent[find(x)] = find(y)
+
+        resource_to_positions = {}
+        for pb in flow_pbs:
+            b = building_map[pb.building_id]
+            for f in b.flows:
+                if f.resource_id not in resource_to_positions:
+                    resource_to_positions[f.resource_id] = []
+                resource_to_positions[f.resource_id].append(pb.position)
+
+        for positions in resource_to_positions.values():
+            for i in range(1, len(positions)):
+                union(positions[0], positions[i])
+
+        components = {}
+        for pb in flow_pbs:
+            root = find(pb.position)
+            if root not in components:
+                components[root] = []
+            components[root].append(pb.position)
+
+        all_resource_ids = {f.resource_id for b in buildings for f in b.flows}
+        resources = session.query(Resource).filter(Resource.id.in_(all_resource_ids)).all()
+        resource_map = {r.id: r for r in resources}
+
+        pb_by_pos = {pb.position: pb for pb in project.buildings}
+        new_chains = []
+        for i, (_, members) in enumerate(components.items()):
+            produced = {}
+            for pos in members:
+                pb = pb_by_pos.get(pos)
+                if not pb:
+                    continue
+                b = building_map.get(pb.building_id)
+                if not b:
+                    continue
+                for f in b.flows:
+                    if f.direction == "produces":
+                        produced[f.resource_id] = produced.get(f.resource_id, 0) + f.quantity * pb.quantity
+
+            best_name = None
+            best_qty = 0
+            for rid, qty in produced.items():
+                if qty > best_qty:
+                    best_qty = qty
+                    best_name = resource_map[rid].name if rid in resource_map else None
+
+            new_chains.append({
+                "name": best_name or f"Chain {i + 1}",
+                "members": sorted(members),
+            })
+
+        return jsonify({"chains": new_chains})
+    finally:
+        session.close()
+
+
+@bp.route("/api/projects/<project_id>/chain-economics", methods=["POST"])
+def chain_economics(project_id):
+    """Compute chain economics (constraint propagation + ruble totals) for a set of positions."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body required"}), 400
+
+    period = data.get("period", "month")
+    if period not in PERIODS:
+        return jsonify({"error": "Invalid period"}), 400
+
+    positions = list({int(p) for p in data.get("positions", [])})
+    project_productivity = float(data.get("project_productivity", 1.0))
+    productivity_overrides = {str(k): float(v) for k, v in data.get("productivity_overrides", {}).items()}
+    normalize = bool(data.get("normalize", False))
+
+    session = get_session()
+    try:
+        project = session.get(Project, project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        empty_response = {
+            "resources": [], "produced": {}, "consumed": {}, "net": {},
+            "coverage": {}, "buildingUtilization": {}, "buildingLimitedBy": {},
+            "importRubles": 0.0, "exportRubles": 0.0, "netRubles": 0.0,
+        }
+
+        pos_set = set(positions)
+        pbs = [pb for pb in project.buildings if pb.position in pos_set]
+        if not pbs:
+            return jsonify(empty_response)
+
+        building_ids = [pb.building_id for pb in pbs]
+        buildings = session.query(Building).filter(Building.id.in_(building_ids)).all()
+        building_map = {b.id: b for b in buildings}
+
+        all_resource_ids = {f.resource_id for b in buildings for f in b.flows}
+        if not all_resource_ids:
+            return jsonify(empty_response)
+
+        resources = session.query(Resource).filter(Resource.id.in_(all_resource_ids)).all()
+
+        prices = {}
+        if project.country_id:
+            for row in (
+                session.query(CountryResourcePrice)
+                .filter_by(country_id=project.country_id)
+                .all()
+            ):
+                prices[row.resource_id] = {
+                    "import": row.import_price or 0.0,
+                    "export": row.export_price or 0.0,
+                }
+
+        period_data = PERIODS[period]
+
+        building_produces = {b.id: {} for b in buildings}
+        building_consumes = {b.id: {} for b in buildings}
+        for b in buildings:
+            for f in b.flows:
+                if f.direction == "produces":
+                    building_produces[b.id][f.resource_id] = f.quantity
+                else:
+                    building_consumes[b.id][f.resource_id] = f.quantity
+
+        def period_mult(r):
+            return period_data["elec"] if r.unit == "MW" else period_data["material"]
+
+        active_pbs = [pb for pb in pbs if building_map.get(pb.building_id)]
+
+        pb_base_produced = {}
+        pb_base_consumed = {}
+        for pb in active_pbs:
+            b = building_map[pb.building_id]
+            factor = productivity_overrides.get(str(pb.position), project_productivity)
+            norm_factor = float(b.workers_needed) if normalize and b.workers_needed > 0 else 1.0
+            pb_base_produced[pb.position] = {}
+            pb_base_consumed[pb.position] = {}
+            for r in resources:
+                mult = period_mult(r)
+                pb_base_produced[pb.position][r.id] = (
+                    building_produces[b.id].get(r.id, 0) * pb.quantity * mult * factor / norm_factor
+                )
+                pb_base_consumed[pb.position][r.id] = (
+                    building_consumes[b.id].get(r.id, 0) * pb.quantity * mult * factor / norm_factor
+                )
+
+        cfactor = {pb.position: 1.0 for pb in active_pbs}
+        building_limited_by = {}
+        for _ in range(20):
+            eff_produced = {r.id: 0.0 for r in resources}
+            eff_consumed = {r.id: 0.0 for r in resources}
+            for pb in active_pbs:
+                cf = cfactor[pb.position]
+                for r in resources:
+                    eff_produced[r.id] += pb_base_produced[pb.position][r.id] * cf
+                    eff_consumed[r.id] += pb_base_consumed[pb.position][r.id] * cf
+
+            coverage = {}
+            for r in resources:
+                if eff_produced[r.id] > 0 and eff_consumed[r.id] > 0:
+                    coverage[r.id] = eff_produced[r.id] / eff_consumed[r.id]
+
+            any_changed = False
+            for pb in active_pbs:
+                min_cov = 1.0
+                limit_rid = None
+                for r in resources:
+                    c = pb_base_consumed[pb.position][r.id]
+                    if c > 0 and r.id in coverage and coverage[r.id] < min_cov - 1e-9:
+                        min_cov = coverage[r.id]
+                        limit_rid = r.id
+                if min_cov < 1.0 - 1e-9:
+                    new_cf = cfactor[pb.position] * min_cov
+                    if abs(new_cf - cfactor[pb.position]) > 1e-9:
+                        cfactor[pb.position] = new_cf
+                        building_limited_by[pb.position] = limit_rid
+                        any_changed = True
+            if not any_changed:
+                break
+
+        produced = {r.id: 0.0 for r in resources}
+        consumed = {r.id: 0.0 for r in resources}
+        for pb in active_pbs:
+            cf = cfactor[pb.position]
+            for r in resources:
+                produced[r.id] += pb_base_produced[pb.position][r.id] * cf
+                consumed[r.id] += pb_base_consumed[pb.position][r.id] * cf
+
+        net = {r.id: produced[r.id] - consumed[r.id] for r in resources}
+
+        final_coverage = {}
+        for r in resources:
+            if produced[r.id] > 0 and consumed[r.id] > 0:
+                final_coverage[r.id] = produced[r.id] / consumed[r.id]
+
+        building_utilization = {}
+        for pb in active_pbs:
+            if cfactor[pb.position] < 1.0 - 1e-6:
+                building_utilization[pb.position] = cfactor[pb.position]
+
+        import_rubles = 0.0
+        export_rubles = 0.0
+        for r in resources:
+            n = net[r.id]
+            if n == 0:
+                continue
+            r_prices = prices.get(r.id, {})
+            if n < 0:
+                import_rubles += abs(n) * r_prices.get("import", 0.0)
+            else:
+                export_rubles += n * r_prices.get("export", 0.0)
+
+        active_rids = {r.id for r in resources if produced[r.id] != 0 or consumed[r.id] != 0}
+
+        return jsonify({
+            "resources": [r.to_dict() for r in resources if r.id in active_rids],
+            "produced": {str(r.id): produced[r.id] for r in resources if r.id in active_rids},
+            "consumed": {str(r.id): consumed[r.id] for r in resources if r.id in active_rids},
+            "net": {str(r.id): net[r.id] for r in resources if r.id in active_rids},
+            "coverage": {str(k): v for k, v in final_coverage.items()},
+            "buildingUtilization": {str(k): v for k, v in building_utilization.items()},
+            "buildingLimitedBy": {str(k): v for k, v in building_limited_by.items()},
+            "importRubles": import_rubles,
+            "exportRubles": export_rubles,
+            "netRubles": export_rubles - import_rubles,
+        })
     finally:
         session.close()

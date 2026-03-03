@@ -129,6 +129,16 @@ PUT /api/projects/<id>/chains/<chain_id>/members
   Body: { positions: [int] }
   Returns: updated chain
 
+POST /api/projects/<id>/chains/auto-detect
+  Suggest chain groupings based on shared resource flows. Does NOT save.
+  No body required.
+  Returns: { chains: [{ name, members: [building_pos] }] }
+
+POST /api/projects/<id>/chain-economics
+  Compute chain economics (constraint propagation + ruble totals) for a set of building positions.
+  Body: { period, positions: [int], project_productivity: float, productivity_overrides: {pos: float}, normalize?: bool }
+  Returns: { resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy, importRubles, exportRubles, netRubles }
+
 ## Health
 
 GET /api/health

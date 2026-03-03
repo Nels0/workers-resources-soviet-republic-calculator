@@ -8,7 +8,7 @@ import ProjectView from './ProjectView'
 vi.mock('./CostCalculator', () => ({
   default: () => <div data-testid="cost-calculator" />
 }))
-vi.mock('./IncomeAnalysis', () => ({
+vi.mock('./income/IncomeAnalysis', () => ({
   default: () => <div data-testid="income-analysis" />
 }))
 
@@ -237,26 +237,26 @@ describe('ProjectView tab structure', () => {
     mockStorage.loadProjects.mockResolvedValue([project])
   })
 
-  it('shows Construction and Operation tabs, no Income tab', async () => {
+  it('shows Construction and Production tabs, no Income tab', async () => {
     renderProjectView()
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Construction' })).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Operation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Production' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Income' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Operation Costs' })).not.toBeInTheDocument()
   })
 
-  it('renders IncomeAnalysis in the Operation tab', async () => {
+  it('renders IncomeAnalysis in the Production tab', async () => {
     const user = userEvent.setup()
     renderProjectView()
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Operation' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Production' })).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Operation' }))
+    await user.click(screen.getByRole('button', { name: 'Production' }))
 
     expect(screen.getByTestId('income-analysis')).toBeInTheDocument()
   })

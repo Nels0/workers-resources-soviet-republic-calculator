@@ -7,7 +7,7 @@ import {
 import { updateProjectAPI } from '../api'
 import { usePersistedState } from '../usePersistedState'
 import CostCalculator from './CostCalculator'
-import IncomeAnalysis from './IncomeAnalysis'
+import IncomeAnalysis from './income/IncomeAnalysis'
 import WinComboBox from './WinComboBox'
 
 function ProjectView({ countryId, prices = {}, onBuildingClick }) {
@@ -289,7 +289,7 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
           className={`win95-tab${activeTab === 'operation' ? ' active' : ''}`}
           onClick={() => setActiveTab('operation')}
         >
-          Operation
+          Production
         </button>
       </div>
 

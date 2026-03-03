@@ -183,3 +183,21 @@ export function updateChainMembersAPI(projectId, chainId, positions) {
     body: JSON.stringify({ positions }),
   });
 }
+
+export function autoDetectChainsAPI(projectId) {
+  return fetchJSON(`/projects/${projectId}/chains/auto-detect`, { method: 'POST' });
+}
+
+export function fetchChainEconomicsAPI(projectId, positions, period, projectProductivity, productivityOverrides, normalize = false) {
+  return fetchJSON(`/projects/${projectId}/chain-economics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      period,
+      positions,
+      project_productivity: projectProductivity,
+      productivity_overrides: productivityOverrides,
+      normalize,
+    }),
+  });
+}

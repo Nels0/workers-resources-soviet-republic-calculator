@@ -357,7 +357,7 @@ function BuildingList({ onBuildingClick }) {
             className={`win95-tab${activeTab === 'production' ? ' active' : ''}`}
             onClick={() => handleTabChange('production')}
           >
-            Production
+            Resource Flows
           </button>
         </div>
 

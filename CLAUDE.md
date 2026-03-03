@@ -158,24 +158,27 @@ cd backend && uv run pytest         # Backend tests
 - `IncomeAnalysis` ruble calculations: net > 0 → use export price; net < 0 → use import price
 - `BuildingSearch` (in `CostCalculator.jsx`): always-visible `.win95-search-results` panel (200px) above the project table; shows first 10 matches as a `BuildingConstructionTable`; arrow keys navigate, Enter adds, Tab completes next word of highlighted result's name
 
-### Income Analysis (`components/IncomeAnalysis.jsx`)
-- Props: `{ projectId, projectBuildings, prices, defaultProductivity, onBuildingClick, onUpdateQty }` — fetches its own buildings/resources from API
+### Income Analysis (`components/income/IncomeAnalysis.jsx`)
+Refactored into `components/income/` directory + two hooks:
+- **`hooks/useProductivity.js`**: `useProductivity(projectId, defaultProductivity, projectBuildings)` — manages `projectProductivity`, `buildingProductivityOverrides`, debounced DB saves, and `getNetFlow(b, pb, r, { applyProductivity, applyNormalize, period })`. Also exports `PERIODS` constant.
+- **`hooks/useChains.js`**: `useChains(projectId)` — manages chain state + API calls; `autoDetectChains()` calls backend `POST /chains/auto-detect` → applies result via `bulkReplaceProjectChainsAPI`.
+- **`components/income/IncomeAnalysis.jsx`** (orchestrator, ~130 lines): uses both hooks; renders toolbar + "Resource Flows" groupbox + `ChainBuilder`.
+- **`components/income/ResourceFlowsTable.jsx`**: per-building resource flow table with `BlockSlider` productivity controls.
+- **`components/income/ChainBuilder.jsx`**: chain list + auto-detect confirm dialog + ungrouped section. Module-level `ChainCard` sub-component manages its own `useEffect` to fetch chain economics from backend (keyed on members, period, productivity).
+- **`components/income/ChainEconomicsPanel.jsx`**: purely presentational; receives `economics` from backend API, computes ₽ totals locally using `prices` + `included`.
+
+Key behaviours:
 - **Toolbar**: Period buttons (Day/Week/Month/Year) | `Productivity: [N]%` number input | `☐ Normalize/worker` checkbox
-- **Productivity factor**: `projectProductivity` (float, init from `defaultProductivity` prop on project switch); debounced 600ms save via `updateProjectAPI`; per-building `buildingProductivityOverrides` map (init from `pb.productivity` on project switch), debounced via `updateBuildingProductivityAPI`
-- **`BlockSlider`** (`components/BlockSlider.jsx`): used for per-building productivity in income tables; `min=0 max=1 step=0.01`; 10 blocks of 10% each with 1%-precision partial fill; label navy+bold if `hasOverride`, muted otherwise; `×` clear button when overriding.
-- **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed` (buildings with 0 workers unaffected); column headers show `/worker/` infix (e.g. `t/worker/mo`)
-- **`getNetFlow(b, pb, r, { applyProductivity, applyNormalize })`**: opts control scaling; productivity factor = `buildingProductivityOverrides[pb.position] ?? projectProductivity`
-- **Period selector**: Raw `.ini` values are per-game-day; `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant holds `materialFactor`, `elecFactor`, `suffix` per period.
-- **Section 1 — Resource Income table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `BlockSlider` in name cell; column headers show `periodUnit` with normalize infix; Qty column is an editable `<input>` (calls `onUpdateQty`) when prop provided; building name is a `.win95-link-btn` that calls `onBuildingClick` when prop provided
-- **Section 2 — Chain Builder**: groups buildings by shared resource relationships
-  - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
-  - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure
-  - Each chain: inline rename, `☐ Prod.` + `☐ Norm.` checkboxes (control chain economics only, persisted in `localStorage` `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building income table (with `BlockSlider`) + chain economics panel
-  - Chain economics panel: Produced / Consumed / Net + Coverage table with per-resource ☐ inclusion checkboxes; statusbar Import/Export/Net ₽; "Unused capacity" section lists supply-constrained buildings
-  - `computeChainEconomics` uses **iterative constraint propagation** (`cfactor` per building, max 20 passes): if a resource is produced AND consumed within the chain and supply < demand, consuming buildings' `cfactor` is multiplied by `coverage` ratio each pass until convergence. Constrained buildings' output is proportionally reduced, cascading through multi-stage chains. Coverage column shows ~100% (balanced/constrained) or >100% (surplus) at convergence; red shortage % never appears post-convergence.
-  - Move dropdown excludes the building's own current chain from options
-  - Ungrouped groupbox shows buildings not in any chain; `BlockSlider` shown there too
-  - Deleting a building from the project (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)
+- **`BlockSlider`** (`components/BlockSlider.jsx`): `min=0 max=1 step=0.01`; 10 blocks of 10% each with 1%-precision partial fill; label navy+bold if `hasOverride`, muted otherwise; `×` clear button when overriding.
+- **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed`; column headers show `/worker/` infix (e.g. `t/worker/mo`)
+- **Period selector**: Raw `.ini` values are per-game-day; `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant: `materialFactor`, `elecFactor`, `suffix`, `label`.
+- **Resource Flows table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `BlockSlider`; Qty editable `<input>` (calls `onUpdateQty`); building name is `.win95-link-btn` (calls `onBuildingClick`)
+- **Chain Builder**: `Auto-detect chains` calls backend endpoint (union-find on server); confirmation dialog if chains exist; `savingChains` disables all three buttons
+  - Each chain: inline rename, `☐ Prod.` + `☐ Norm.` checkboxes (localStorage `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building table + chain economics panel
+  - Chain economics panel: Produced / Consumed / Net + Coverage table with per-resource ☐ inclusion; statusbar Import/Export/Net ₽; "Unused capacity" section
+  - Chain economics computed via **backend endpoint** `POST /api/projects/<id>/chain-economics` (iterative constraint propagation, max 20 passes); `ChainCard` fetches on members/period/productivity change
+  - Move dropdown excludes building's own chain; ungrouped groupbox shows unchained buildings
+  - Deleting a building (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)
 - **Persistence**: project productivity → DB; per-building productivity overrides → DB; normalize view → localStorage; chain Prod./Norm. checkboxes → localStorage; chain inclusion checkboxes → localStorage
 
 ### Project Chains
@@ -185,10 +188,12 @@ cd backend && uv run pytest         # Backend tests
 - `PUT /api/projects/<id>/chains` bulk-replaces all chains (used by auto-detect)
 - `PUT /api/projects/<id>/chains/<chain_id>` accepts optional `position` field for reordering
 - Migration: `backend/migrate_add_chains.py` — included in `make migrate`
-- Chain API functions in `frontend/src/api.js`: `fetchProjectChains`, `createProjectChainAPI`, `bulkReplaceProjectChainsAPI`, `updateProjectChainAPI`, `deleteProjectChainAPI`, `updateChainMembersAPI`
+- Chain API functions in `frontend/src/api.js`: `fetchProjectChains`, `createProjectChainAPI`, `bulkReplaceProjectChainsAPI`, `updateProjectChainAPI`, `deleteProjectChainAPI`, `updateChainMembersAPI`, `autoDetectChainsAPI`, `fetchChainEconomicsAPI`
+- `autoDetectChainsAPI(projectId)` — `POST /projects/<id>/chains/auto-detect` (no body); returns `{chains: [{name, members}]}`; does NOT save
+- `fetchChainEconomicsAPI(projectId, positions, period, projectProductivity, productivityOverrides, normalize)` — `POST /projects/<id>/chain-economics`; returns `{resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy, importRubles, exportRubles, netRubles}`
 
 ### Testing
-- **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx`
+- **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx` and `src/components/income/*.test.jsx`
 - **Frontend browser:** Vitest browser mode + Playwright + Firefox. Loads `win95.css`, disables auto-cleanup (`RTL_SKIP_AUTO_CLEANUP`), 2s delay between tests for visual inspection. Setup: `src/browser-test-setup.js`
 - **Backend:** pytest with in-memory SQLite. Tests: `backend/tests/`
 - Test cleanup is handled by setup files (`test-setup.js` / `browser-test-setup.js`), not in test files
@@ -205,9 +210,9 @@ Project uses `eslint-plugin-react-hooks` v7 which adds many new rules beyond cla
 
 ### Navigation
 - **Info** section: Buildings list (`/`), Building detail (`/buildings/:id`)
-  - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
+  - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Resource Flows** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
-- **Planning** section: Projects (`/projects`) — two tabs: **Construction** / **Operation** (Resource Income + Chain Builder)
+- **Planning** section: Projects (`/projects`) — two tabs: **Construction** / **Production** (Resource Flows table + Chain Builder)
 - **Resource Prices** panel: toggled by "Prices" button in taskbar; draggable + resizable floating panel, available on all pages
 - **Loan Calculator** panel: toggled by "Loan" button in taskbar (after Prices); `DebtCalculator` component; position persisted in localStorage
 

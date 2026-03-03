@@ -4,23 +4,29 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import IncomeAnalysis from './IncomeAnalysis'
 
-vi.mock('../api', () => ({
+vi.mock('../../api', () => ({
   fetchBuildingsList: vi.fn(),
   fetchProjectChains: vi.fn(),
+  autoDetectChainsAPI: vi.fn(),
   bulkReplaceProjectChainsAPI: vi.fn(),
   updateProjectChainAPI: vi.fn(),
   deleteProjectChainAPI: vi.fn(),
   updateChainMembersAPI: vi.fn(),
   createProjectChainAPI: vi.fn(),
+  fetchChainEconomicsAPI: vi.fn(),
+  updateProjectAPI: vi.fn(),
+  updateBuildingProductivityAPI: vi.fn(),
 }))
 
 import {
   fetchBuildingsList,
   fetchProjectChains,
+  autoDetectChainsAPI,
   bulkReplaceProjectChainsAPI,
   updateProjectChainAPI,
   createProjectChainAPI,
-} from '../api'
+  fetchChainEconomicsAPI,
+} from '../../api'
 
 const RESOURCES = [
   { id: 10, name: 'Steel', type: 'material', unit: 't' },
@@ -32,6 +38,7 @@ const BUILDING_WITH_FLOWS = {
   name: 'Steel Mill',
   source_file: 'steel_mill.ini',
   category: 'industry',
+  workers_needed: 0,
   produces: { '10': 5 },
   consumes: { '20': 3 },
 }
@@ -41,17 +48,18 @@ const BUILDING_NO_FLOWS = {
   name: 'Warehouse',
   source_file: 'warehouse.ini',
   category: 'logistics',
+  workers_needed: 0,
   produces: {},
   consumes: {},
 }
 
 const PROJECT_BUILDINGS_FLOW_ONLY = [
-  { buildingId: 1, quantity: 2, position: 0 },
+  { buildingId: 1, quantity: 2, position: 0, productivity: null },
 ]
 
 const PROJECT_BUILDINGS_MIXED = [
-  { buildingId: 1, quantity: 2, position: 0 },
-  { buildingId: 2, quantity: 1, position: 1 },
+  { buildingId: 1, quantity: 2, position: 0, productivity: null },
+  { buildingId: 2, quantity: 1, position: 1, productivity: null },
 ]
 
 const PRICES_PARTIAL = { '10': { import: 100, export: 0 } } // Steel (import) priced at 100, Coal unpriced
@@ -76,6 +84,7 @@ beforeEach(() => {
     resources: RESOURCES,
   })
   fetchProjectChains.mockResolvedValue([])
+  autoDetectChainsAPI.mockResolvedValue({ chains: [] })
   bulkReplaceProjectChainsAPI.mockResolvedValue([])
   updateProjectChainAPI.mockResolvedValue({})
   createProjectChainAPI.mockResolvedValue({
@@ -83,6 +92,11 @@ beforeEach(() => {
     name: 'Chain 1',
     position: 0,
     members: [],
+  })
+  fetchChainEconomicsAPI.mockResolvedValue({
+    resources: [], produced: {}, consumed: {}, net: {},
+    coverage: {}, buildingUtilization: {}, buildingLimitedBy: {},
+    importRubles: 0, exportRubles: 0, netRubles: 0,
   })
 })
 
@@ -92,6 +106,8 @@ describe('Gap 8: loading/error feedback during auto-detect', () => {
   it('disables buttons and shows saving status while auto-detect is in flight', async () => {
     let resolveCall
     const inflightPromise = new Promise(r => { resolveCall = r })
+    // autoDetectChainsAPI resolves immediately; bulkReplaceProjectChainsAPI is in-flight
+    autoDetectChainsAPI.mockResolvedValue({ chains: [] })
     bulkReplaceProjectChainsAPI.mockReturnValueOnce(inflightPromise)
 
     renderIncomeAnalysis()
@@ -102,7 +118,9 @@ describe('Gap 8: loading/error feedback during auto-detect', () => {
     const user = userEvent.setup({ delay: null })
     await user.click(screen.getByRole('button', { name: 'Auto-detect chains' }))
 
-    expect(screen.getByRole('button', { name: 'Auto-detect chains' })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Auto-detect chains' })).toBeDisabled()
+    )
     expect(screen.getByRole('button', { name: 'Clear chains' })).toBeDisabled()
     expect(screen.getByText('Saving chains\u2026')).toBeInTheDocument()
 
@@ -114,6 +132,7 @@ describe('Gap 8: loading/error feedback during auto-detect', () => {
   })
 
   it('shows error message when auto-detect fails', async () => {
+    autoDetectChainsAPI.mockResolvedValue({ chains: [] })
     bulkReplaceProjectChainsAPI.mockRejectedValueOnce(new Error('Server error'))
 
     renderIncomeAnalysis()
@@ -162,6 +181,7 @@ describe('Gap 2: auto-detect confirmation dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Auto-detect chains' }))
     await user.click(screen.getByRole('button', { name: 'No' }))
 
+    expect(autoDetectChainsAPI).not.toHaveBeenCalled()
     expect(bulkReplaceProjectChainsAPI).not.toHaveBeenCalled()
     expect(screen.queryByText(/This will replace your current chains/)).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('Iron Chain')).toBeInTheDocument()
@@ -169,6 +189,7 @@ describe('Gap 2: auto-detect confirmation dialog', () => {
 
   it('runs auto-detect when Yes is clicked', async () => {
     fetchProjectChains.mockResolvedValue([EXISTING_CHAIN])
+    autoDetectChainsAPI.mockResolvedValue({ chains: [{ name: 'Steel', members: [] }] })
     bulkReplaceProjectChainsAPI.mockResolvedValue([
       { id: 'new-1', name: 'Steel', position: 0, members: [] },
     ])
@@ -182,12 +203,14 @@ describe('Gap 2: auto-detect confirmation dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Auto-detect chains' }))
     await user.click(screen.getByRole('button', { name: 'Yes' }))
 
+    await waitFor(() => expect(autoDetectChainsAPI).toHaveBeenCalled())
     await waitFor(() => expect(bulkReplaceProjectChainsAPI).toHaveBeenCalled())
     expect(screen.queryByText(/This will replace your current chains/)).not.toBeInTheDocument()
   })
 
   it('runs auto-detect immediately when no chains exist', async () => {
     fetchProjectChains.mockResolvedValue([])
+    autoDetectChainsAPI.mockResolvedValue({ chains: [] })
     bulkReplaceProjectChainsAPI.mockResolvedValue([])
 
     renderIncomeAnalysis()
@@ -199,6 +222,7 @@ describe('Gap 2: auto-detect confirmation dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Auto-detect chains' }))
 
     expect(screen.queryByText(/This will replace your current chains/)).not.toBeInTheDocument()
+    await waitFor(() => expect(autoDetectChainsAPI).toHaveBeenCalled())
     await waitFor(() => expect(bulkReplaceProjectChainsAPI).toHaveBeenCalled())
   })
 })

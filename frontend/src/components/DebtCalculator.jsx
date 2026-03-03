@@ -21,7 +21,7 @@ function computeLoan(principal, rate, termYears) {
   const interestPaid = totalRepaid - principal
   const annual = monthly * 12
   const weekly = monthly * 12 / 52
-  const daily = monthly * 365.25 / 12
+  const daily = monthly * 12 / 365.25
 
   return { monthly, annual, weekly, daily, totalRepaid, interestPaid }
 }

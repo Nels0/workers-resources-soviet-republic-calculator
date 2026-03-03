@@ -294,7 +294,7 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
       </div>
 
       <div style={{ padding: 4 }}>
-        {activeTab === 'construction' && (
+        <div style={{ display: activeTab === 'construction' ? '' : 'none' }}>
           <CostCalculator
             projectBuildings={project?.buildings || []}
             prices={prices}
@@ -303,8 +303,8 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
             onUpdateQty={handleUpdateQty}
             onBuildingClick={onBuildingClick}
           />
-        )}
-        {activeTab === 'operation' && (
+        </div>
+        <div style={{ display: activeTab === 'operation' ? '' : 'none' }}>
           <IncomeAnalysis
             projectId={project?.id}
             projectBuildings={project?.buildings || []}
@@ -313,7 +313,7 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
             onBuildingClick={onBuildingClick}
             onUpdateQty={handleUpdateQty}
           />
-        )}
+        </div>
       </div>
 
       {renderCreateDialog()}

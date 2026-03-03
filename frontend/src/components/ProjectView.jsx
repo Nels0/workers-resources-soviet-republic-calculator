@@ -4,11 +4,13 @@ import {
   addBuilding, removeBuilding, updateBuildingQty,
   migrateFromLocalStorage
 } from '../projectStorage'
+import { updateProjectAPI } from '../api'
 import { usePersistedState } from '../usePersistedState'
 import CostCalculator from './CostCalculator'
 import IncomeAnalysis from './IncomeAnalysis'
+import WinComboBox from './WinComboBox'
 
-function ProjectView({ countryId, prices = {} }) {
+function ProjectView({ countryId, prices = {}, onBuildingClick }) {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = usePersistedState('wrsr:selectedProjectId', null)
   const [activeTab, setActiveTab] = useState('construction')
@@ -104,6 +106,15 @@ function ProjectView({ countryId, prices = {} }) {
       setError(err.message)
     }
   }, [selectedId, countryId])
+
+  const handleRenameProject = useCallback(async (id, name) => {
+    try {
+      await updateProjectAPI(id, { name })
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [refresh])
 
   const handleUpdateQty = useCallback(async (position, qty) => {
     if (!selectedId) return
@@ -255,15 +266,12 @@ function ProjectView({ countryId, prices = {} }) {
 
       <div className="win95-toolbar">
         <label>Project:</label>
-        <select
-          className="win95-select"
-          value={selectedId || ''}
-          onChange={e => setSelectedId(e.target.value)}
-        >
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        <WinComboBox
+          items={projects.map(p => ({ id: p.id, label: p.name }))}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onRename={handleRenameProject}
+        />
         <button className="win95-btn" onClick={openCreateDialog}>New</button>
         <button className="win95-btn" onClick={() => setShowDeleteDialog(true)}>Delete</button>
       </div>
@@ -291,6 +299,7 @@ function ProjectView({ countryId, prices = {} }) {
             onAdd={handleAdd}
             onRemove={handleRemove}
             onUpdateQty={handleUpdateQty}
+            onBuildingClick={onBuildingClick}
           />
         )}
         {activeTab === 'operation' && (
@@ -299,6 +308,8 @@ function ProjectView({ countryId, prices = {} }) {
             projectBuildings={project?.buildings || []}
             prices={prices}
             defaultProductivity={project?.productivity ?? 1.0}
+            onBuildingClick={onBuildingClick}
+            onUpdateQty={handleUpdateQty}
           />
         )}
       </div>

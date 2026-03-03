@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import BuildingList from './components/BuildingList'
 import BuildingDetail from './components/BuildingDetail'
+import BuildingInfoWindow from './components/BuildingInfoWindow'
 import ProjectView from './components/ProjectView'
 import CountrySelector from './components/CountrySelector'
 import ResourcePrices from './components/ResourcePrices'
-import { fetchCountries, createCountryAPI, deleteCountryAPI, fetchCountryPrices, updateCountryPricesAPI } from './api'
+import { fetchCountries, createCountryAPI, deleteCountryAPI, updateCountryAPI, fetchCountryPrices, updateCountryPricesAPI } from './api'
 import './win95.css'
 
 function App() {
@@ -18,6 +19,17 @@ function App() {
   const [showCountryDeleteDialog, setShowCountryDeleteDialog] = useState(false)
   const [newCountryName, setNewCountryName] = useState('')
   const [countryError, setCountryError] = useState(null)
+  const [openBuildingId, setOpenBuildingId] = useState(null)
+  const [panelHeight, setPanelHeight] = useState(500)
+  const [panelPos, setPanelPos] = useState(() => ({
+    x: window.innerWidth - 560,
+    y: 36,
+  }))
+  const [panelDragging, setPanelDragging] = useState(false)
+  const panelDraggingRef = useRef(false)
+  const panelDragOffset = useRef({ x: 0, y: 0 })
+  const panelResizing = useRef(false)
+  const panelResizeStart = useRef({ y: 0, h: 0 })
   const newCountryInputRef = useRef(null)
 
   // Load countries on mount — inline to avoid react-hooks/set-state-in-effect
@@ -43,6 +55,44 @@ function App() {
       newCountryInputRef.current.focus()
     }
   }, [showCountryCreateDialog])
+
+  useEffect(() => {
+    function onMove(e) {
+      if (panelDraggingRef.current) {
+        setPanelPos({
+          x: Math.max(0, e.clientX - panelDragOffset.current.x),
+          y: Math.max(0, e.clientY - panelDragOffset.current.y),
+        })
+      }
+      if (panelResizing.current) {
+        const delta = e.clientY - panelResizeStart.current.y
+        setPanelHeight(Math.max(100, panelResizeStart.current.h + delta))
+      }
+    }
+    function onUp() {
+      if (panelDraggingRef.current) { panelDraggingRef.current = false; setPanelDragging(false) }
+      panelResizing.current = false
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  const handlePanelTitlebarMouseDown = useCallback((e) => {
+    panelDraggingRef.current = true
+    setPanelDragging(true)
+    panelDragOffset.current = { x: e.clientX - panelPos.x, y: e.clientY - panelPos.y }
+    e.preventDefault()
+  }, [panelPos])
+
+  const handlePanelResizeMouseDown = useCallback((e) => {
+    panelResizing.current = true
+    panelResizeStart.current = { y: e.clientY, h: panelHeight }
+    e.preventDefault()
+  }, [panelHeight])
 
   async function refreshCountries() {
     const data = await fetchCountries()
@@ -72,6 +122,15 @@ function App() {
       const updated = await refreshCountries()
       setSelectedCountryId(updated.length > 0 ? updated[0].id : null)
       setCountryError(null)
+    } catch (err) {
+      setCountryError(err.message)
+    }
+  }
+
+  async function handleRenameCountry(id, name) {
+    try {
+      await updateCountryAPI(id, name)
+      await refreshCountries()
     } catch (err) {
       setCountryError(err.message)
     }
@@ -186,6 +245,7 @@ function App() {
           onSelectCountry={setSelectedCountryId}
           onNewCountry={() => { setNewCountryName(''); setShowCountryCreateDialog(true) }}
           onDeleteCountry={() => setShowCountryDeleteDialog(true)}
+          onRenameCountry={handleRenameCountry}
         />
         <div className="win95-taskbar-sep" />
         <button
@@ -203,7 +263,7 @@ function App() {
       <Routes>
         <Route path="/" element={
           <div style={{ padding: '8px' }}>
-            <BuildingList />
+            <BuildingList onBuildingClick={setOpenBuildingId} />
           </div>
         } />
         <Route path="/buildings/:id" element={
@@ -216,6 +276,7 @@ function App() {
             <ProjectView
               countryId={selectedCountryId}
               prices={effectivePrices}
+              onBuildingClick={setOpenBuildingId}
             />
           </div>
         } />
@@ -224,9 +285,23 @@ function App() {
       {renderCountryCreateDialog()}
       {renderCountryDeleteDialog()}
 
+      {openBuildingId && (
+        <BuildingInfoWindow
+          buildingId={openBuildingId}
+          onClose={() => setOpenBuildingId(null)}
+        />
+      )}
+
       {showPricesPanel && (
-        <div className="win95-side-panel">
-          <div className="win95-titlebar">
+        <div
+          className="win95-side-panel"
+          style={{ left: panelPos.x, top: panelPos.y, right: 'auto', height: panelHeight }}
+        >
+          <div
+            className={`win95-titlebar${panelDragging ? ' dragging' : ''}`}
+            style={{ cursor: panelDragging ? 'grabbing' : 'grab', userSelect: 'none' }}
+            onMouseDown={handlePanelTitlebarMouseDown}
+          >
             <span>Resource Prices</span>
             <div className="win95-titlebar-buttons">
               <button className="win95-titlebar-btn" onClick={() => setShowPricesPanel(false)}>X</button>
@@ -239,6 +314,7 @@ function App() {
               onUpdatePrices={handleUpdateCountryPrices}
             />
           </div>
+          <div className="win95-resize-s" onMouseDown={handlePanelResizeMouseDown} />
         </div>
       )}
     </div>

@@ -55,6 +55,14 @@ export function deleteCountryAPI(id) {
   return fetchJSON(`/countries/${id}`, { method: 'DELETE' });
 }
 
+export function updateCountryAPI(id, name) {
+  return fetchJSON(`/countries/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
 export function fetchCountryPrices(countryId) {
   return fetchJSON(`/countries/${countryId}/prices`);
 }

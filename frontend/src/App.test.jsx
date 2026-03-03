@@ -22,6 +22,7 @@ const mockApi = vi.hoisted(() => ({
   fetchCountries: vi.fn(),
   createCountryAPI: vi.fn(),
   deleteCountryAPI: vi.fn(),
+  updateCountryAPI: vi.fn(),
   fetchCountryPrices: vi.fn(),
   updateCountryPricesAPI: vi.fn(),
   fetchProjects: vi.fn(),
@@ -68,7 +69,8 @@ describe('App country selector', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Country:')).toBeInTheDocument()
-      expect(screen.getByRole('combobox')).toBeInTheDocument()
+      // WinComboBox shows selected label in display
+      expect(screen.getByText('Country A')).toBeInTheDocument()
     })
   })
 
@@ -81,19 +83,18 @@ describe('App country selector', () => {
     renderApp()
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('c1')
+      // First country's name should be displayed in the combo box
+      expect(screen.getByText('Country A')).toBeInTheDocument()
     })
   })
 
-  it('shows empty select when no countries loaded', async () => {
+  it('shows placeholder when no countries loaded', async () => {
     mockApi.fetchCountries.mockResolvedValue([])
 
     renderApp()
 
     await waitFor(() => {
-      // select exists with no options
-      const select = screen.getByRole('combobox')
-      expect(select.options.length).toBe(0)
+      expect(screen.getByText('-- Select --')).toBeInTheDocument()
     })
   })
 
@@ -136,7 +137,7 @@ describe('App country selector', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('c-new')
+      expect(screen.getByText('My Country')).toBeInTheDocument()
     })
   })
 
@@ -168,7 +169,7 @@ describe('App country selector', () => {
     renderApp()
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('c1')
+      expect(screen.getByText('Alpha')).toBeInTheDocument()
     })
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
@@ -179,7 +180,7 @@ describe('App country selector', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('c2')
+      expect(screen.getByText('Beta')).toBeInTheDocument()
     })
   })
 })

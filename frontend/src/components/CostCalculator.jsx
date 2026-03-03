@@ -96,7 +96,7 @@ function BuildingSearch({ buildings, resources, onAdd }) {
   )
 }
 
-function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd }) {
+function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd, onBuildingClick }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -199,7 +199,10 @@ function CostCalculator({ projectBuildings, prices, onUpdateQty, onRemove, onAdd
                 return (
                   <tr key={i}>
                     <td>
-                      <Link to={`/buildings/${b.id}`}>{b.name}</Link>
+                      {onBuildingClick
+                        ? <button className="win95-link-btn" onClick={() => onBuildingClick(b.id)}>{b.name}</button>
+                        : <Link to={`/buildings/${b.id}`}>{b.name}</Link>
+                      }
                       {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
                     </td>
                     <td>

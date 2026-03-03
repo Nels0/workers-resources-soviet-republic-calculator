@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import {
   fetchBuildingsList,
   fetchProjectChains,
@@ -104,7 +103,7 @@ const PERIODS = {
   year:  { label: 'Year',  suffix: '/yr',  materialFactor: 5 * 365.2425,        elecFactor: 24 * 365.2425 },
 }
 
-function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivity = 1.0 }) {
+function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivity = 1.0, onBuildingClick, onUpdateQty }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [chains, setChains] = useState([])
@@ -433,7 +432,10 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
               return (
                 <tr key={i}>
                   <td>
-                    <Link to={`/buildings/${b.id}`}>{b.name}</Link>
+                    {onBuildingClick
+                      ? <button className="win95-link-btn" onClick={() => onBuildingClick(b.id)}>{b.name}</button>
+                      : b.name
+                    }
                     {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
                     {showProductivityOverride && (
                       <div style={{ marginTop: 2 }}>
@@ -452,7 +454,21 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
                       {renderMoveDropdown(pb)}
                     </td>
                   )}
-                  <td className="num">{pb.quantity}</td>
+                  <td className="num">
+                    {onUpdateQty
+                      ? (
+                        <input
+                          type="number"
+                          className="win95-input"
+                          style={{ width: '3.5em' }}
+                          min="1"
+                          value={pb.quantity}
+                          onChange={e => onUpdateQty(pb.position, Math.max(1, Number(e.target.value) || 1))}
+                        />
+                      )
+                      : pb.quantity
+                    }
+                  </td>
                   {activeResources.map(r => (
                     <td key={r.id} className="num">{renderNetCell(getNetFlow(b, pb, r, flowOpts))}</td>
                   ))}

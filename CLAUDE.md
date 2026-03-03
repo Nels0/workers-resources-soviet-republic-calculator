@@ -96,7 +96,11 @@ cd backend && uv run pytest         # Backend tests
 - Win95-styled classes from `src/win95.css` (`.win95-window`, `.win95-btn`, `.win95-input`, `.win95-table`, `.win95-tab`, `.win95-dialog`, `.win95-side-panel`, `.win95-search-results`, etc.)
 - Raised/sunken 3D borders, gray backgrounds (#c0c0c0), blue title bars, inset panels
 - Win95-styled dialogs (`.win95-dialog-overlay` + `.win95-dialog`) — never browser `prompt()`/`confirm()`
-- Win95-styled side panel (`.win95-side-panel` + `.win95-side-panel-body`) — fixed right-side window with titlebar
+- Win95-styled side panel (`.win95-side-panel` + `.win95-side-panel-body`) — draggable, vertically resizable floating window; `App.jsx` owns `panelPos` (x/y) + `panelHeight` state; resize handle: `.win95-resize-s` at bottom
+- `.win95-draggable-window` — `position:fixed`, `box-shadow: 4px 4px 0 #000`; titlebar gets `cursor:grab`/`grabbing` via `.dragging` class
+- `.win95-resize-s` — 5px south resize handle with dotted grip; `cursor:ns-resize`; add to any vertically resizable panel/window
+- `.win95-link-btn` — borderless button styled as a navy underlined link; used for building name cells that open the info popup instead of navigating
+- `.win95-combobox` / `.win95-combobox-display` / `.win95-combobox-arrow` / `.win95-combobox-list` / `.win95-combobox-option` — custom combo box styles
 - `.win95-search-results` — always-visible in-flow fixed-height (200px) panel with inset border; uses `border-collapse: separate; border-spacing: 0` scoped override to fix Firefox sticky-header bug inside `overflow-y: auto` containers
 - `.win95-table tr.selected td` — keyboard-selection highlight (same blue as hover); `.win95-table tr.selected .win95-muted` — light blue so source_file remains readable
 - Building names display `source_file` alongside (smaller, greyed out via `win95-muted`) to disambiguate duplicates
@@ -107,7 +111,9 @@ cd backend && uv run pytest         # Backend tests
 - Never nest component definitions — use render helpers (e.g. `renderSortHeader()`)
 - API calls through `frontend/src/api.js` fetch wrapper
 - `<label htmlFor="id">` + `<select id="id">` required for `getByRole('combobox', { name: /Label/i })` in tests
-- `BuildingConstructionTable` (`components/BuildingConstructionTable.jsx`) — shared Name + Category + sparse resource cost table. Sort mode (`onSort` prop): sortable headers, Link name cells. Select mode (`onSelect` prop): static headers, clickable rows with `selectedIndex` highlight. Used by `BuildingList` (sort mode) and `BuildingSearch` in `CostCalculator` (select mode).
+- `BuildingConstructionTable` (`components/BuildingConstructionTable.jsx`) — shared Name + Category + sparse resource cost table. Sort mode (`onSort` prop): sortable headers, name cells are Links or `.win95-link-btn` buttons (when `onBuildingClick` provided). Select mode (`onSelect` prop): static headers, clickable rows. Used by `BuildingList` (sort mode) and `BuildingSearch` in `CostCalculator` (select mode).
+- `BuildingInfoWindow` (`components/BuildingInfoWindow.jsx`) — draggable, vertically resizable floating popup; props `{ buildingId, onClose }`; fetches `GET /api/buildings/:id`; renders same content as `BuildingDetail`; titlebar drag via `mousemove`/`mouseup` on document; bottom `.win95-resize-s` handle. `App.jsx` owns `openBuildingId` state; passes `onBuildingClick={setOpenBuildingId}` to `BuildingList` and `ProjectView`; `ProjectView` threads it to `CostCalculator` and `IncomeAnalysis`.
+- `WinComboBox` (`components/WinComboBox.jsx`) — custom Win95 combo box; props `{ items:[{id,label}], selectedId, onSelect, onRename, placeholder }`; single-click opens dropdown, double-click on display enters inline rename (input replaces label); Enter/blur commits rename, Escape cancels; click-outside closes. Used by `CountrySelector` (with `onRenameCountry` → `PUT /api/countries/<id>`) and `ProjectView` project picker (with `handleRenameProject` → `updateProjectAPI`).
 
 ### Backend
 - Flask blueprints in `app/routes/`, factory in `app/__init__.py`
@@ -121,9 +127,10 @@ cd backend && uv run pytest         # Backend tests
 ### Countries
 - `Country` model: `{ id (UUID), name, created_at }` — top-level container for projects + prices
 - `CountryResourcePrice`: `{ country_id, resource_id, import_price, export_price }` UNIQUE(country_id, resource_id)
-- Country selector in taskbar (persistent global context); auto-selects first country on load
+- Country selector in taskbar uses `WinComboBox`; double-click name to rename inline; auto-selects first country on load
 - Country delete blocked if it has any projects (returns 409); cascade deletes prices
 - `GET/PUT /api/countries/<id>/prices` — bulk-replace; format `{rid: {import: price, export: price}}`; entries where both are 0/null discarded
+- `PUT /api/countries/<id>` — rename; `{ name }` required
 - Migrations: `migrate_add_countries.py`, `migrate_add_import_export_prices.py` — run via `make migrate`
 
 ### Projects
@@ -140,21 +147,21 @@ cd backend && uv run pytest         # Backend tests
 - `GET /api/projects?country_id=<id>` — filter by country
 - Prices are per-country (shared across all projects in a country): `App.jsx` owns `countryPrices` state, fetches on country switch, passes to `ProjectView` as `prices` prop
 - Prices are split into **import price** (cost to bring in a deficit) and **export price** (revenue from a surplus); `countryPrices` shape: `{ rid: { import: price, export: price } }`
-- Resource Prices live in a **taskbar-toggled side panel** (Prices button, right of CountrySelector); accessible from any page
+- Resource Prices live in a **taskbar-toggled floating panel** (Prices button, right of CountrySelector); draggable via titlebar, vertically resizable via bottom edge; `App.jsx` owns `panelPos` + `panelHeight` state
 - `ResourcePrices` accepts `countryId` + `prices` + `onUpdatePrices`; derives used resources from all cost/flow fields (`resource_costs`, `operation_costs`, `produces`, `consumes`); two price inputs per row (Import ₽ / Export ₽); auto-saves with 600ms debounce
 - `CostCalculator` uses `prices[rid]?.import` (construction materials are imports); single column per resource: unit amount + navy ruble sub-line. Footer: unit totals row, ₽ totals row, grand total row
 - `IncomeAnalysis` ruble calculations: net > 0 → use export price; net < 0 → use import price
 - `BuildingSearch` (in `CostCalculator.jsx`): always-visible `.win95-search-results` panel (200px) above the project table; shows first 10 matches as a `BuildingConstructionTable`; arrow keys navigate, Enter adds, Tab completes next word of highlighted result's name
 
 ### Income Analysis (`components/IncomeAnalysis.jsx`)
-- Props: `{ projectId, projectBuildings, prices, defaultProductivity }` — fetches its own buildings/resources from API
+- Props: `{ projectId, projectBuildings, prices, defaultProductivity, onBuildingClick, onUpdateQty }` — fetches its own buildings/resources from API
 - **Toolbar**: Period buttons (Day/Week/Month/Year) | `Productivity: [N]%` number input | `☐ Normalize/worker` checkbox
 - **Productivity factor**: `projectProductivity` (float, init from `defaultProductivity` prop on project switch); debounced 600ms save via `updateProjectAPI`; per-building `buildingProductivityOverrides` map (init from `pb.productivity` on project switch), debounced via `updateBuildingProductivityAPI`
 - **`ProductivitySlider`** (module-level component): 10 navy/gray blocks, Win95 inset container, click-and-drag, snaps to 10% increments (0–100%); shows `%` label (navy+bold if overridden, muted if default); `×` clear button when overridden. Used in building name cell of all income tables.
 - **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed` (buildings with 0 workers unaffected); column headers show `/worker/` infix (e.g. `t/worker/mo`)
 - **`getNetFlow(b, pb, r, { applyProductivity, applyNormalize })`**: opts control scaling; productivity factor = `buildingProductivityOverrides[pb.position] ?? projectProductivity`
 - **Period selector**: Raw `.ini` values are per-game-day; `material × 5 = t/day`, `MW × 24 = MWh/day`. `PERIODS` constant holds `materialFactor`, `elecFactor`, `suffix` per period.
-- **Section 1 — Resource Income table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `ProductivitySlider` in name cell; column headers show `periodUnit` with normalize infix
+- **Section 1 — Resource Income table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `ProductivitySlider` in name cell; column headers show `periodUnit` with normalize infix; Qty column is an editable `<input>` (calls `onUpdateQty`) when prop provided; building name is a `.win95-link-btn` that calls `onBuildingClick` when prop provided
 - **Section 2 — Chain Builder**: groups buildings by shared resource relationships
   - Controls: `Auto-detect chains` (union-find; confirmation dialog if chains exist), `Clear chains`, `New chain`
   - `savingChains` state disables all three buttons during API calls; error shown in statusbar on failure
@@ -190,7 +197,7 @@ cd backend && uv run pytest         # Backend tests
   - BuildingList has two tabs: **Construction** (sparse resource columns + material filter) and **Production** (flow buildings only, ↑↓ annotations, direction + resource filters)
   - BuildingDetail has compact header (category/workers/days/source), Construction Costs groupbox, Operation groupbox (operation costs + production flows with ↑ Produces / ↓ Consumes rows)
 - **Planning** section: Projects (`/projects`) — two tabs: **Construction Costs** / **Operation** (Resource Income + Chain Builder)
-- **Resource Prices** panel: toggled by "Prices" button in taskbar; fixed right-side panel (`win95-side-panel`), available on all pages
+- **Resource Prices** panel: toggled by "Prices" button in taskbar; draggable + resizable floating panel, available on all pages
 
 ### Data Models
 - `Building` → `BuildingCost` (phase: construction/operation) + `BuildingFlow` (direction: produces/consumes)

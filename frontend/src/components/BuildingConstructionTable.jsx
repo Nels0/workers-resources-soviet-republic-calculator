@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
 // Shared construction cost table used by BuildingList and BuildingSearch.
-// - With onSort: sortable headers (BuildingList mode), name cells are Links.
+// - With onSort: sortable headers (BuildingList mode), name cells are Links or buttons.
 // - With onSelect: static headers, name cells are plain text, rows are clickable (search mode).
 function BuildingConstructionTable({
   buildings,
@@ -16,6 +16,8 @@ function BuildingConstructionTable({
   sortKey,
   sortAsc,
   onSort,
+  // Building info popup
+  onBuildingClick,
 }) {
   const activeColumns = useMemo(
     () => resources.filter(r => buildings.some(b => (b.resource_costs?.[String(r.id)] || 0) > 0)),
@@ -56,7 +58,9 @@ function BuildingConstructionTable({
             <td>
               {onSelect
                 ? b.name
-                : <Link to={`/buildings/${b.id}`}>{b.name}</Link>
+                : onBuildingClick
+                  ? <button className="win95-link-btn" onClick={() => onBuildingClick(b.id)}>{b.name}</button>
+                  : <Link to={`/buildings/${b.id}`}>{b.name}</Link>
               }
               {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
             </td>

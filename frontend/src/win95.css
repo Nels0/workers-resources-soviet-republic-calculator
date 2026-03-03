@@ -505,7 +505,6 @@ body {
   position: fixed;
   top: 36px;
   right: 0;
-  bottom: 0;
   width: 560px;
   z-index: 100;
   background: var(--win95-bg);
@@ -566,4 +565,152 @@ body {
   justify-content: flex-end;
   gap: 6px;
   padding: 0 12px 12px;
+}
+
+/* Draggable floating window — used by BuildingInfoWindow */
+
+.win95-draggable-window {
+  position: fixed;
+  z-index: 1000;
+  min-width: 420px;
+  max-width: 600px;
+  box-shadow: 4px 4px 0 #000;
+}
+
+.win95-draggable-window .win95-titlebar {
+  cursor: grab;
+  user-select: none;
+}
+
+.win95-draggable-window .win95-titlebar.dragging {
+  cursor: grabbing;
+}
+
+/* South (vertical) resize handle — bottom of draggable windows and side panel */
+
+.win95-resize-s {
+  height: 5px;
+  cursor: ns-resize;
+  background: var(--win95-bg);
+  border-top: 1px solid var(--win95-shadow);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.win95-resize-s::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--win95-shadow) 0px,
+    var(--win95-shadow) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Custom combo box */
+
+.win95-combobox {
+  position: relative;
+  display: inline-flex;
+  min-width: 150px;
+  vertical-align: middle;
+}
+
+.win95-combobox-display {
+  flex: 1;
+  background: #ffffff;
+  border-top: 2px solid var(--win95-shadow);
+  border-left: 2px solid var(--win95-shadow);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+  padding: 1px 4px;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1.4em;
+  line-height: 1.4;
+}
+
+.win95-combobox-display input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  width: 100%;
+  padding: 0;
+}
+
+.win95-combobox-arrow {
+  width: 20px;
+  flex-shrink: 0;
+  background: var(--win95-bg);
+  border-top: 2px solid var(--win95-light);
+  border-left: 2px solid var(--win95-light);
+  border-bottom: 2px solid var(--win95-dark);
+  border-right: 2px solid var(--win95-dark);
+  font-size: 0.7em;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.win95-combobox-arrow:active {
+  border-top: 2px solid var(--win95-dark);
+  border-left: 2px solid var(--win95-dark);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+}
+
+.win95-combobox-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #ffffff;
+  border-top: 2px solid var(--win95-shadow);
+  border-left: 2px solid var(--win95-shadow);
+  border-bottom: 2px solid var(--win95-light);
+  border-right: 2px solid var(--win95-light);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.win95-combobox-option {
+  padding: 2px 4px;
+  cursor: default;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  white-space: nowrap;
+}
+
+.win95-combobox-option:hover,
+.win95-combobox-option.selected {
+  background: var(--win95-blue);
+  color: #ffffff;
+}
+
+/* Link-style button (no chrome, looks like a link) */
+
+.win95-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--win95-font);
+  font-size: var(--win95-base-size);
+  color: var(--win95-blue);
+  cursor: pointer;
+  text-decoration: underline;
 }

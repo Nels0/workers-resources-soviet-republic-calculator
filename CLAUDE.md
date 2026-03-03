@@ -141,8 +141,8 @@ cd backend && uv run pytest         # Backend tests
 ### Projects
 - Stored in backend SQLite (`Project` + `ProjectBuilding` models)
 - `Project` now has nullable `country_id` FK; no longer has per-project prices
-- `Project.productivity` (float, default 1.0) — project-wide productivity factor for Operation tab
-- `ProjectBuilding.productivity` (float, nullable) — per-building override; null means use project default
+- `Project.productivity` (float, default 1.0) — stored in DB but no longer exposed in the UI (was project-wide factor; superseded by per-building sliders)
+- `ProjectBuilding.productivity` (float, nullable) — per-building staffing-level override (fraction of workers employed; null means 1.0)
 - `frontend/src/projectStorage.js` — async wrappers; `loadProjects(countryId)`, `createProject(name, countryId)`
 - Shape: `{ id, name, country_id, productivity, buildings: [{ buildingId, quantity, position, productivity }] }`
 - `position` field preserves order and serves as key for update/delete API calls
@@ -160,26 +160,27 @@ cd backend && uv run pytest         # Backend tests
 
 ### Income Analysis (`components/income/IncomeAnalysis.jsx`)
 Refactored into `components/income/` directory + two hooks:
-- **`hooks/useProductivity.js`**: `useProductivity(projectId, defaultProductivity, projectBuildings)` — manages `projectProductivity`, `buildingProductivityOverrides`, debounced DB saves, and `getNetFlow(b, pb, r, { applyProductivity, applyNormalize, period })`. Also exports `PERIODS` constant.
+- **`hooks/useProductivity.js`**: `useProductivity(projectId, projectBuildings)` — manages `buildingProductivityOverrides`, debounced DB saves, and `getNetFlow(b, pb, r, { applyProductivity, applyNormalize, period })`. Also exports `PERIODS` constant. No project-wide productivity state.
 - **`hooks/useChains.js`**: `useChains(projectId)` — manages chain state + API calls; `autoDetectChains()` calls backend `POST /chains/auto-detect` → applies result via `bulkReplaceProjectChainsAPI`.
-- **`components/income/IncomeAnalysis.jsx`** (orchestrator, ~130 lines): uses both hooks; renders toolbar + "Resource Flows" groupbox + `ChainBuilder`.
-- **`components/income/ResourceFlowsTable.jsx`**: per-building resource flow table with `BlockSlider` productivity controls.
-- **`components/income/ChainBuilder.jsx`**: chain list + auto-detect confirm dialog + ungrouped section. Module-level `ChainCard` sub-component manages its own `useEffect` to fetch chain economics from backend (keyed on members, period, productivity).
-- **`components/income/ChainEconomicsPanel.jsx`**: purely presentational; receives `economics` from backend API, computes ₽ totals locally using `prices` + `included`.
+- **`components/income/IncomeAnalysis.jsx`** (orchestrator): uses both hooks; renders toolbar + "Resource Flows" groupbox + `ChainBuilder`.
+- **`components/income/ResourceFlowsTable.jsx`**: per-building resource flow table with `BlockSlider` productivity controls. `showRubles` prop (default `true`) — when `false` hides the `₽ Net` column entirely (used by chain panels).
+- **`components/income/ChainBuilder.jsx`**: chain list + auto-detect confirm dialog + ungrouped section. Module-level `ChainCard` sub-component manages its own `useEffect` to fetch chain economics from backend (keyed on members, period, overrides, normalizeView).
+- **`components/income/ChainEconomicsPanel.jsx`**: purely presentational; receives `economics` from backend API, computes ₽ totals locally using `prices` + `included`; shows `(+?)` muted indicator per-row and in Net ₽ statusbar when any included resource lacks a price.
 
 Key behaviours:
-- **Toolbar**: Period buttons (Day/Week/Month/Year) | `Productivity: [N]%` number input | `☐ Normalize/worker` checkbox
-- **`BlockSlider`** (`components/BlockSlider.jsx`): `min=0 max=1 step=0.01`; 10 blocks of 10% each with 1%-precision partial fill; label navy+bold if `hasOverride`, muted otherwise; `×` clear button when overriding.
+- **Toolbar**: Period buttons (Day/Week/Month/Year) | `☐ Normalize/worker` checkbox (no project-wide productivity input)
+- **Productivity = staffing level**: per-building slider represents fraction of workers employed (0–100%). In `getNetFlow`, productivity is **not** applied when `applyNormalize=true` — each active worker produces at full rated rate regardless of headcount, so normalize shows intrinsic per-worker efficiency. Backend `chain-economics` always applies the productivity factor (staffing affects total throughput and chain constraint propagation regardless of normalize mode); normalize only controls `norm_factor` (÷ `workers_needed`).
+- **`BlockSlider`** (`components/BlockSlider.jsx`): `min=0 max=1 step=0.01`; 10 blocks of 10% each with 1%-precision partial fill; label navy+bold if `hasOverride`, muted otherwise; `×` clear button when overriding. Fallback when no override: `1.0`.
 - **Normalize/worker**: `normalizeView` bool (persisted in `localStorage` `normalize-view-${projectId}`); divides flows by `workers_needed`; column headers show `/worker/` infix (e.g. `t/worker/mo`)
 - **Period selector**: Raw `.ini` values are per-worker per-game-day (materials) or MW continuous (electricity). `PERIODS` constant: `materialFactor` = game-days in period (1/7/30.44/365.24); `elecFactor` = game-days × 120 real-hours/game-day (1 game-day = 5 real days = 120 real hours). `getNetFlow` multiplies material flows by `b.workers_needed`; electricity uses `elecFactor` directly. In normalize mode the `×workers_needed` cancels the `/workers_needed` division.
 - **Resource Flows table**: always `{ applyProductivity: true, applyNormalize: normalizeView }`; per-building `BlockSlider`; Qty editable `<input>` (calls `onUpdateQty`); building name is `.win95-link-btn` (calls `onBuildingClick`)
 - **Chain Builder**: `Auto-detect chains` calls backend endpoint (union-find on server); confirmation dialog if chains exist; `savingChains` disables all three buttons
-  - Each chain: inline rename, `☐ Prod.` + `☐ Norm.` checkboxes (localStorage `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building table + chain economics panel
-  - Chain economics panel: Produced / Consumed / Net + Coverage table with per-resource ☐ inclusion; statusbar Import/Export/Net ₽; "Unused capacity" section
-  - Chain economics computed via **backend endpoint** `POST /api/projects/<id>/chain-economics` (iterative constraint propagation, max 20 passes); `ChainCard` fetches on members/period/productivity change
+  - Each chain: inline rename, `☐ Prod.` checkbox only (localStorage `chain-factors-${projectId}`), ▲/▼ reorder, `Dissolve`; per-building table (`showRubles={false}`) + chain economics panel
+  - Chain economics panel: Produced / Consumed / Net + "Internal %" (coverage) table with per-resource ☐ inclusion; `(+?)` per unpriced row and in statusbar Net ₽; "Idle capacity" section (building name + qty, bottleneck resource). Pass `chainPbs` + `buildingMap` from ChainCard for name lookup.
+  - Chain economics computed via **backend endpoint** `POST /api/projects/<id>/chain-economics` (iterative constraint propagation, max 20 passes); `ChainCard` fetches on members/period/overrides/normalizeView change
   - Move dropdown excludes building's own chain; ungrouped groupbox shows unchained buildings
   - Deleting a building (Construction tab) auto-cleans its `ProjectChainMember` rows (backend)
-- **Persistence**: project productivity → DB; per-building productivity overrides → DB; normalize view → localStorage; chain Prod./Norm. checkboxes → localStorage; chain inclusion checkboxes → localStorage
+- **Persistence**: per-building productivity overrides → DB; normalize view → localStorage; chain Prod. checkboxes → localStorage; chain inclusion checkboxes → localStorage
 
 ### Project Chains
 - `ProjectChain`: `{ id (UUID), project_id, name, position }` — display order within a project
@@ -190,7 +191,7 @@ Key behaviours:
 - Migration: `backend/migrate_add_chains.py` — included in `make migrate`
 - Chain API functions in `frontend/src/api.js`: `fetchProjectChains`, `createProjectChainAPI`, `bulkReplaceProjectChainsAPI`, `updateProjectChainAPI`, `deleteProjectChainAPI`, `updateChainMembersAPI`, `autoDetectChainsAPI`, `fetchChainEconomicsAPI`
 - `autoDetectChainsAPI(projectId)` — `POST /projects/<id>/chains/auto-detect` (no body); returns `{chains: [{name, members}]}`; does NOT save
-- `fetchChainEconomicsAPI(projectId, positions, period, projectProductivity, productivityOverrides, normalize)` — `POST /projects/<id>/chain-economics`; returns `{resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy, importRubles, exportRubles, netRubles}`
+- `fetchChainEconomicsAPI(projectId, positions, period, effProductivity, productivityOverrides, normalize)` — `POST /projects/<id>/chain-economics`; `effProductivity` is always `1.0` from ChainCard; returns `{resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy, importRubles, exportRubles, netRubles}`
 
 ### Testing
 - **Frontend unit:** Vitest + @testing-library/react + jsdom. Tests: `src/components/*.test.jsx` and `src/components/income/*.test.jsx`

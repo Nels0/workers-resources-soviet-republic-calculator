@@ -5,7 +5,7 @@ import { useChains } from '../../hooks/useChains'
 import ResourceFlowsTable from './ResourceFlowsTable'
 import ChainBuilder from './ChainBuilder'
 
-function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivity = 1.0, onBuildingClick, onUpdateQty }) {
+function IncomeAnalysis({ projectId, projectBuildings, prices, onBuildingClick, onUpdateQty }) {
   const [allBuildings, setAllBuildings] = useState([])
   const [resources, setResources] = useState([])
   const [loadingBuildings, setLoadingBuildings] = useState(true)
@@ -15,10 +15,9 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
   const [prevProjectId, setPrevProjectId] = useState(projectId)
 
   const {
-    projectProductivity, setProjectProductivity,
     buildingProductivityOverrides, setBuildingProductivity, clearBuildingProductivity,
     getNetFlow,
-  } = useProductivity(projectId, defaultProductivity, projectBuildings)
+  } = useProductivity(projectId, projectBuildings)
 
   const {
     chains, savingChains, chainError,
@@ -120,18 +119,6 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
           >{p.label}</button>
         ))}
         <span style={{ margin: '0 2px', color: '#808080' }}>|</span>
-        <span style={{ fontSize: '0.85em' }}>Productivity:</span>
-        <input
-          type="number"
-          className="win95-input"
-          style={{ width: 48, textAlign: 'right', fontSize: '0.85em', padding: '1px 4px' }}
-          min={0}
-          max={200}
-          value={Math.round(projectProductivity * 100)}
-          onChange={e => setProjectProductivity(e.target.value)}
-          title="Project-wide productivity factor (0–200%)"
-        />
-        <span style={{ fontSize: '0.85em' }}>%</span>
         <label style={{ fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 3 }}>
           <input
             type="checkbox"
@@ -154,7 +141,6 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
           normalizeView={normalizeView}
           showProductivityOverride
           buildingProductivityOverrides={buildingProductivityOverrides}
-          projectProductivity={projectProductivity}
           onBuildingClick={onBuildingClick}
           onUpdateQty={onUpdateQty}
           chains={chains}
@@ -181,7 +167,6 @@ function IncomeAnalysis({ projectId, projectBuildings, prices, defaultProductivi
         included={included}
         onToggleIncluded={toggleIncluded}
         buildingProductivityOverrides={buildingProductivityOverrides}
-        projectProductivity={projectProductivity}
         onBuildingClick={onBuildingClick}
         onUpdateQty={onUpdateQty}
         chains={chains}

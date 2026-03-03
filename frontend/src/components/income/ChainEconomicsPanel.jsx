@@ -1,6 +1,6 @@
 import { PERIODS } from '../../hooks/useProductivity'
 
-function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncluded }) {
+function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncluded, chainPbs, buildingMap }) {
   if (!economics) return null
 
   const { resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy } = economics
@@ -19,11 +19,17 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
 
   let importRubles = 0
   let exportRubles = 0
+  let hasMissingPrice = false
   for (const r of nonZero) {
     if (included[String(r.id)] === false) continue
     const n = net[String(r.id)] || 0
-    if (n < 0) importRubles += Math.abs(n) * importPrice(r)
-    else if (n > 0) exportRubles += n * exportPrice(r)
+    if (n < 0) {
+      importRubles += Math.abs(n) * importPrice(r)
+      if (importPrice(r) === 0) hasMissingPrice = true
+    } else if (n > 0) {
+      exportRubles += n * exportPrice(r)
+      if (exportPrice(r) === 0) hasMissingPrice = true
+    }
   }
   const netRubles = exportRubles - importRubles
   const netRubleColor = netRubles > 0 ? '#000080' : netRubles < 0 ? '#c00000' : undefined
@@ -41,7 +47,7 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
               <th>Consumed</th>
               <th>Net</th>
               {hasCoverage && (
-                <th title="Internal supply coverage">Coverage</th>
+                <th title="Internal supply / internal demand for resources traded within this chain">Internal %</th>
               )}
               {hasAnyPrice && <th title="Include in ₽ totals">☐</th>}
             </tr>
@@ -54,6 +60,7 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
               const netColor = n < 0 ? '#c00000' : undefined
               const netLabel = n > 0 ? `+${Math.round(n * 100) / 100} ↑`
                 : n < 0 ? `${Math.round(n * 100) / 100} ↓` : '0'
+              const missingPrice = n !== 0 && (n > 0 ? exportPrice(r) === 0 : importPrice(r) === 0)
 
               let coverageCell = null
               if (cov != null) {
@@ -62,15 +69,15 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
                   const surplus = Math.round(n * 100) / 100
                   coverageCell = (
                     <span style={{ color: '#000080' }}
-                      title={`${surplus} ${r.unit}${suffix} surplus — ${pct - 100}% excess production`}>
-                      {pct}%
+                      title={`${pct - 100}% excess — ${surplus} ${r.unit}${suffix} exported from chain`}>
+                      +{pct - 100}%
                     </span>
                   )
                 } else {
                   coverageCell = (
                     <span className="win95-muted"
-                      title="Internally balanced — consuming buildings scaled to available supply">
-                      ~100%
+                      title="Fully consumed internally — downstream buildings scale to available supply">
+                      =100%
                     </span>
                   )
                 }
@@ -81,7 +88,10 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
                   <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({r.unit}{suffix})</span></td>
                   <td className="num">{produced[rid] ? Math.round(produced[rid] * 100) / 100 : ''}</td>
                   <td className="num">{consumed[rid] ? Math.round(consumed[rid] * 100) / 100 : ''}</td>
-                  <td className="num" style={{ color: netColor }}>{netLabel}</td>
+                  <td className="num" style={{ color: netColor }}>
+                    {netLabel}
+                    {missingPrice && <span className="win95-muted"> (+?)</span>}
+                  </td>
                   {hasCoverage && <td className="num">{coverageCell}</td>}
                   {hasAnyPrice && (
                     <td style={{ textAlign: 'center' }}>
@@ -101,15 +111,18 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
 
       {bottleneckedBuildings.length > 0 && (
         <div className="win95-inset" style={{ marginTop: 4, padding: '3px 6px', fontSize: '0.85em' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Unused capacity:</div>
+          <div style={{ fontWeight: 'bold', marginBottom: 2 }}>Idle capacity:</div>
           {bottleneckedBuildings.map(([pos, util]) => {
             const limitRid = buildingLimitedBy?.[pos]
             const limitResource = resources.find(r => String(r.id) === String(limitRid))
             const usedPct = Math.round(parseFloat(util) * 100)
             const unusedPct = 100 - usedPct
+            const pb = chainPbs?.find(p => String(p.position) === String(pos))
+            const b = pb && buildingMap?.[pb.buildingId]
+            const label = b ? `${b.name}${pb.quantity > 1 ? ` ×${pb.quantity}` : ''}` : `pos ${pos}`
             return (
               <div key={pos} style={{ color: '#c00000' }}>
-                pos {pos} ×: {unusedPct}% unused — limited by {limitResource?.name ?? '?'}
+                {label}: {unusedPct}% idle — waiting for {limitResource?.name ?? '?'}
               </div>
             )
           })}
@@ -122,6 +135,7 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
           <span>Export: ₽{Math.round(exportRubles * 100) / 100}{suffix}</span>
           <span style={{ color: netRubleColor, fontWeight: 'bold' }}>
             Net: ₽{netRubles >= 0 ? '+' : ''}{Math.round(netRubles * 100) / 100}{suffix}
+            {hasMissingPrice && <span className="win95-muted"> (+?)</span>}
           </span>
         </div>
       )}

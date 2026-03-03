@@ -5,8 +5,8 @@ import ChainEconomicsPanel from './ChainEconomicsPanel'
 
 // Module-level component (not nested) — manages its own economics fetch per chain
 function ChainCard({
-  chain, projectId, period, projectProductivity, buildingProductivityOverrides,
-  chainProd, chainNorm, projectBuildings, buildingMap, flowResourceList,
+  chain, projectId, period, buildingProductivityOverrides,
+  chainProd, projectBuildings, buildingMap, flowResourceList,
   getNetFlow, prices, included, onToggleIncluded, normalizeView,
   onBuildingClick, onUpdateQty, chains,
   onRename, onCommitName, onMoveUp, onMoveDown, onDissolve, onMoveBuilding,
@@ -16,7 +16,7 @@ function ChainCard({
   const [economicsLoading, setEconomicsLoading] = useState(false)
 
   const membersKey = [...chain.members].sort().join(',')
-  const effProductivity = chainProd ? projectProductivity : 1.0
+  const effProductivity = 1.0
   const relevantOverrides = chainProd
     ? Object.fromEntries(
         chain.members
@@ -33,13 +33,13 @@ function ChainCard({
     }
     setEconomicsLoading(true)
     fetchChainEconomicsAPI(
-      projectId, chain.members, period, effProductivity, relevantOverrides, chainNorm
+      projectId, chain.members, period, effProductivity, relevantOverrides, normalizeView
     )
       .then(setEconomics)
       .catch(console.error)
       .finally(() => setEconomicsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain.id, membersKey, period, effProductivity, overridesKey, chainNorm, projectId])
+  }, [chain.id, membersKey, period, overridesKey, normalizeView, projectId])
 
   const chainPbs = chain.members
     .map(pos => projectBuildings.find(pb => pb.position === pos))
@@ -61,11 +61,6 @@ function ChainCard({
             onChange={e => onToggleFactor(chain.id, 'productivity', e.target.checked)} />
           Prod.
         </label>
-        <label style={{ fontSize: '0.8em', display: 'flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' }}>
-          <input type="checkbox" checked={chainNorm}
-            onChange={e => onToggleFactor(chain.id, 'normalize', e.target.checked)} />
-          Norm.
-        </label>
         <button className="win95-btn" style={{ fontSize: '0.85em', padding: '1px 4px' }}
           onClick={() => onMoveUp(chain.id)} title="Move up">▲</button>
         <button className="win95-btn" style={{ fontSize: '0.85em', padding: '1px 4px' }}
@@ -85,8 +80,8 @@ function ChainCard({
             normalizeView={normalizeView}
             showMove
             showProductivityOverride
+            showRubles={false}
             buildingProductivityOverrides={buildingProductivityOverrides}
-            projectProductivity={projectProductivity}
             onBuildingClick={onBuildingClick}
             onUpdateQty={onUpdateQty}
             chains={chains}
@@ -103,6 +98,8 @@ function ChainCard({
             prices={prices}
             included={included}
             onToggleIncluded={onToggleIncluded}
+            chainPbs={chainPbs}
+            buildingMap={buildingMap}
           />
         </div>
       </div>
@@ -122,7 +119,6 @@ function ChainBuilder({
   included,
   onToggleIncluded,
   buildingProductivityOverrides,
-  projectProductivity,
   onBuildingClick,
   onUpdateQty,
   chains,
@@ -157,12 +153,12 @@ function ChainBuilder({
   }
 
   function getChainFactors(chainId) {
-    return chainFactors[chainId] ?? { productivity: true, normalize: true }
+    return chainFactors[chainId] ?? { productivity: true }
   }
 
   function handleToggleFactor(chainId, key, value) {
     setChainFactors(prev => {
-      const current = prev[chainId] ?? { productivity: true, normalize: true }
+      const current = prev[chainId] ?? { productivity: true }
       const updated = { ...prev, [chainId]: { ...current, [key]: value } }
       if (projectId) localStorage.setItem(`chain-factors-${projectId}`, JSON.stringify(updated))
       return updated
@@ -206,10 +202,8 @@ function ChainBuilder({
             chain={chain}
             projectId={projectId}
             period={period}
-            projectProductivity={projectProductivity}
             buildingProductivityOverrides={buildingProductivityOverrides}
             chainProd={factors.productivity}
-            chainNorm={factors.normalize}
             projectBuildings={projectBuildings}
             buildingMap={buildingMap}
             flowResourceList={flowResourceList}
@@ -248,7 +242,6 @@ function ChainBuilder({
             showMove={chains.length > 0}
             showProductivityOverride
             buildingProductivityOverrides={buildingProductivityOverrides}
-            projectProductivity={projectProductivity}
             onBuildingClick={onBuildingClick}
             onUpdateQty={onUpdateQty}
             chains={chains}

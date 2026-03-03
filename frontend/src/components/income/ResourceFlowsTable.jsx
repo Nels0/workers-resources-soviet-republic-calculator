@@ -11,8 +11,8 @@ function ResourceFlowsTable({
   normalizeView,
   showMove = false,
   showProductivityOverride = false,
+  showRubles = true,
   buildingProductivityOverrides,
-  projectProductivity,
   onBuildingClick,
   onUpdateQty,
   chains,
@@ -49,7 +49,7 @@ function ResourceFlowsTable({
 
   function importPrice(r) { return parseFloat(prices?.[String(r.id)]?.import) || 0 }
   function exportPrice(r) { return parseFloat(prices?.[String(r.id)]?.export) || 0 }
-  const hasAnyPrice = activeResources.some(r => importPrice(r) > 0 || exportPrice(r) > 0)
+  const hasAnyPrice = showRubles && activeResources.some(r => importPrice(r) > 0 || exportPrice(r) > 0)
 
   function periodUnit(r) {
     const base = r.unit === 'MW' ? 'MWh' : r.unit
@@ -160,7 +160,7 @@ function ResourceFlowsTable({
                     <div style={{ marginTop: 2 }}>
                       <BlockSlider
                         min={0} max={1} step={0.01}
-                        value={Math.min(1, buildingProductivityOverrides?.[pb.position] ?? projectProductivity)}
+                        value={Math.min(1, buildingProductivityOverrides?.[pb.position] ?? 1.0)}
                         onChange={factor => onBuildingProductivityChange(pb.position, factor)}
                         label={v => `${Math.round(v * 100)}%`}
                         hasOverride={hasOverride}

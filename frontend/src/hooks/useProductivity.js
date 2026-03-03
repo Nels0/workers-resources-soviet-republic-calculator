@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { updateProjectAPI, updateBuildingProductivityAPI } from '../api'
+import { updateBuildingProductivityAPI } from '../api'
 
 export const PERIODS = {
   day:   { label: 'Day',   suffix: '/day', materialFactor: 1,             elecFactor: 120 },
@@ -8,8 +8,7 @@ export const PERIODS = {
   year:  { label: 'Year',  suffix: '/yr',  materialFactor: 365.2425,      elecFactor: 120 * 365.2425 },
 }
 
-export function useProductivity(projectId, defaultProductivity, projectBuildings) {
-  const [projectProductivity, setProjectProductivityState] = useState(defaultProductivity ?? 1.0)
+export function useProductivity(projectId, projectBuildings) {
   const [buildingProductivityOverrides, setBuildingProductivityOverrides] = useState(() => {
     const overrides = {}
     for (const pb of projectBuildings) {
@@ -22,7 +21,6 @@ export function useProductivity(projectId, defaultProductivity, projectBuildings
   const [prevProjectId, setPrevProjectId] = useState(projectId)
   if (prevProjectId !== projectId) {
     setPrevProjectId(projectId)
-    setProjectProductivityState(defaultProductivity ?? 1.0)
     const overrides = {}
     for (const pb of projectBuildings) {
       if (pb.productivity != null) overrides[pb.position] = pb.productivity
@@ -30,19 +28,7 @@ export function useProductivity(projectId, defaultProductivity, projectBuildings
     setBuildingProductivityOverrides(overrides)
   }
 
-  const projectProdDebounceRef = useRef(null)
   const buildingProdDebounceRef = useRef({})
-
-  function setProjectProductivity(val) {
-    const pct = parseInt(val, 10)
-    if (isNaN(pct)) return
-    const factor = Math.max(0, Math.min(200, pct)) / 100
-    setProjectProductivityState(factor)
-    if (projectProdDebounceRef.current) clearTimeout(projectProdDebounceRef.current)
-    projectProdDebounceRef.current = setTimeout(() => {
-      if (projectId) updateProjectAPI(projectId, { productivity: factor }).catch(console.error)
-    }, 600)
-  }
 
   function setBuildingProductivity(pos, val) {
     const factor = typeof val === 'number'
@@ -66,26 +52,25 @@ export function useProductivity(projectId, defaultProductivity, projectBuildings
   }
 
   // getNetFlow closes over productivity state; period is passed dynamically in opts
+  // Productivity (staffing level) is NOT applied when applyNormalize=true: each active
+  // worker produces at the same rate regardless of how many workers are employed, so the
+  // normalize view shows rated per-worker output independent of staffing level.
   const getNetFlow = useCallback((b, pb, r, { applyProductivity = true, applyNormalize = false, period = 'month' } = {}) => {
     const p = PERIODS[period] || PERIODS.month
     const mult = r.unit === 'MW' ? p.elecFactor : p.materialFactor * (b.workers_needed || 1)
     const raw = ((b.produces?.[String(r.id)] || 0) - (b.consumes?.[String(r.id)] || 0)) * pb.quantity
     let value = raw * mult
-    if (applyProductivity) {
-      const factor = buildingProductivityOverrides[pb.position] != null
-        ? buildingProductivityOverrides[pb.position]
-        : projectProductivity
+    if (applyProductivity && !applyNormalize) {
+      const factor = buildingProductivityOverrides[pb.position] ?? 1.0
       value *= factor
     }
     if (applyNormalize && b.workers_needed > 0) {
       value /= b.workers_needed
     }
     return value
-  }, [buildingProductivityOverrides, projectProductivity])
+  }, [buildingProductivityOverrides])
 
   return {
-    projectProductivity,
-    setProjectProductivity,
     buildingProductivityOverrides,
     setBuildingProductivity,
     clearBuildingProductivity,

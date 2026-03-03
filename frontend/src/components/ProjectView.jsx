@@ -309,7 +309,6 @@ function ProjectView({ countryId, prices = {}, onBuildingClick }) {
             projectId={project?.id}
             projectBuildings={project?.buildings || []}
             prices={prices}
-            defaultProductivity={project?.productivity ?? 1.0}
             onBuildingClick={onBuildingClick}
             onUpdateQty={handleUpdateQty}
           />

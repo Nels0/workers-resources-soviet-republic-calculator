@@ -18,3 +18,20 @@ dist/
 
 # Plans
 plan*.md
+
+# Sandbox sentinel files (created by Claude Code sandbox enforcement)
+HEAD
+config
+hooks
+objects
+refs
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.idea
+.mcp.json
+.profile
+.ripgreprc
+.zprofile
+.zshrc

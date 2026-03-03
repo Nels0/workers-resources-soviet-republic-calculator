@@ -146,12 +146,13 @@ class TestChainEconomics:
         assert resp.status_code == 200
         data = resp.get_json()
 
-        # mine produces 2.4 * 5 = 12 t coal/day
+        # mine produces 2.4 * 1 * 5workers = 12 t coal/day (no input constraint)
         assert abs(data["produced"][coal_id] - 12.0) < 0.01
-        # mill consumes 2.0 * 5 = 10 t coal/day
-        assert abs(data["consumed"][coal_id] - 10.0) < 0.01
-        # mill produces 1.2 * 5 = 6 t steel/day
-        assert abs(data["produced"][steel_id] - 6.0) < 0.01
+        # mill needs 2.0 * 1 * 10workers = 20 t coal/day, but mine only produces 12 →
+        # mill cfactor = 12/20 = 0.6; post-constraint consumed = 20 * 0.6 = 12
+        assert abs(data["consumed"][coal_id] - 12.0) < 0.01
+        # mill steel post-constraint = 1.2 * 1 * 10workers * 0.6 = 7.2 t steel/day
+        assert abs(data["produced"][steel_id] - 7.2) < 0.01
 
     def test_surplus_mine(self, client):
         session = get_session()
@@ -220,7 +221,7 @@ class TestChainEconomics:
             "productivity_overrides": {str(mine_pos): 0.5},
         })
         data = resp.get_json()
-        # mine at 50%: 2.4 * 0.5 * 5 = 6 t/day
+        # mine at 50%: 2.4 * 0.5 * 1 * 5workers = 6 t/day
         assert abs(data["produced"][coal_id] - 6.0) < 0.1
 
     def test_ruble_totals_with_prices(self, client):
@@ -250,10 +251,10 @@ class TestChainEconomics:
             "productivity_overrides": {},
         })
         data = resp.get_json()
-        # steel net = 6 t/day * 100 = 600 export rubles/day
-        assert abs(data["exportRubles"] - 600.0) < 1.0
+        # mill at 60% cfactor: steel net = 7.2 t/day * 100 = 720 export rubles/day
+        assert abs(data["exportRubles"] - 720.0) < 1.0
         assert data["importRubles"] == 0.0
-        assert abs(data["netRubles"] - 600.0) < 1.0
+        assert abs(data["netRubles"] - 720.0) < 1.0
 
     def test_invalid_period_returns_400(self, client):
         pid = client.post("/api/projects", json={"name": "P"}).get_json()["id"]

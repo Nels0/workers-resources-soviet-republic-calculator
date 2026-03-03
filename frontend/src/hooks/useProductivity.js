@@ -2,10 +2,10 @@ import { useState, useRef, useCallback } from 'react'
 import { updateProjectAPI, updateBuildingProductivityAPI } from '../api'
 
 export const PERIODS = {
-  day:   { label: 'Day',   suffix: '/day', materialFactor: 5,                   elecFactor: 24 },
-  week:  { label: 'Week',  suffix: '/wk',  materialFactor: 5 * 7,               elecFactor: 24 * 7 },
-  month: { label: 'Month', suffix: '/mo',  materialFactor: 5 * 365.2425 / 12,   elecFactor: 24 * 365.2425 / 12 },
-  year:  { label: 'Year',  suffix: '/yr',  materialFactor: 5 * 365.2425,        elecFactor: 24 * 365.2425 },
+  day:   { label: 'Day',   suffix: '/day', materialFactor: 1,             elecFactor: 120 },
+  week:  { label: 'Week',  suffix: '/wk',  materialFactor: 7,             elecFactor: 120 * 7 },
+  month: { label: 'Month', suffix: '/mo',  materialFactor: 365.2425 / 12, elecFactor: 120 * 365.2425 / 12 },
+  year:  { label: 'Year',  suffix: '/yr',  materialFactor: 365.2425,      elecFactor: 120 * 365.2425 },
 }
 
 export function useProductivity(projectId, defaultProductivity, projectBuildings) {
@@ -68,7 +68,7 @@ export function useProductivity(projectId, defaultProductivity, projectBuildings
   // getNetFlow closes over productivity state; period is passed dynamically in opts
   const getNetFlow = useCallback((b, pb, r, { applyProductivity = true, applyNormalize = false, period = 'month' } = {}) => {
     const p = PERIODS[period] || PERIODS.month
-    const mult = r.unit === 'MW' ? p.elecFactor : p.materialFactor
+    const mult = r.unit === 'MW' ? p.elecFactor : p.materialFactor * (b.workers_needed || 1)
     const raw = ((b.produces?.[String(r.id)] || 0) - (b.consumes?.[String(r.id)] || 0)) * pb.quantity
     let value = raw * mult
     if (applyProductivity) {

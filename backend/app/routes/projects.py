@@ -10,10 +10,10 @@ from ..models import (
 )
 
 PERIODS = {
-    "day":   {"material": 5,                    "elec": 24},
-    "week":  {"material": 5 * 7,                "elec": 24 * 7},
-    "month": {"material": 5 * 365.2425 / 12,    "elec": 24 * 365.2425 / 12},
-    "year":  {"material": 5 * 365.2425,          "elec": 24 * 365.2425},
+    "day":   {"material": 1,             "elec": 120},
+    "week":  {"material": 7,             "elec": 120 * 7},
+    "month": {"material": 365.2425 / 12, "elec": 120 * 365.2425 / 12},
+    "year":  {"material": 365.2425,      "elec": 120 * 365.2425},
 }
 
 bp = Blueprint("projects", __name__)
@@ -548,13 +548,15 @@ def chain_economics(project_id):
             norm_factor = float(b.workers_needed) if normalize and b.workers_needed > 0 else 1.0
             pb_base_produced[pb.position] = {}
             pb_base_consumed[pb.position] = {}
+            worker_scale = float(b.workers_needed) if b.workers_needed > 0 else 1.0
             for r in resources:
                 mult = period_mult(r)
+                w = 1.0 if r.unit == "MW" else worker_scale
                 pb_base_produced[pb.position][r.id] = (
-                    building_produces[b.id].get(r.id, 0) * pb.quantity * mult * factor / norm_factor
+                    building_produces[b.id].get(r.id, 0) * pb.quantity * mult * factor * w / norm_factor
                 )
                 pb_base_consumed[pb.position][r.id] = (
-                    building_consumes[b.id].get(r.id, 0) * pb.quantity * mult * factor / norm_factor
+                    building_consumes[b.id].get(r.id, 0) * pb.quantity * mult * factor * w / norm_factor
                 )
 
         cfactor = {pb.position: 1.0 for pb in active_pbs}

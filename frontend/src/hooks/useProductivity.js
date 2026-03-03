@@ -2,10 +2,10 @@ import { useState, useRef, useCallback } from 'react'
 import { updateBuildingProductivityAPI } from '../api'
 
 export const PERIODS = {
-  day:   { label: 'Day',   suffix: '/day', materialFactor: 1,             elecFactor: 120 },
-  week:  { label: 'Week',  suffix: '/wk',  materialFactor: 7,             elecFactor: 120 * 7 },
-  month: { label: 'Month', suffix: '/mo',  materialFactor: 365.2425 / 12, elecFactor: 120 * 365.2425 / 12 },
-  year:  { label: 'Year',  suffix: '/yr',  materialFactor: 365.2425,      elecFactor: 120 * 365.2425 },
+  day:   { label: 'Day',   suffix: '/day', char: 'D', materialFactor: 1,             elecFactor: 120 },
+  week:  { label: 'Week',  suffix: '/wk',  char: 'W', materialFactor: 7,             elecFactor: 120 * 7 },
+  month: { label: 'Month', suffix: '/mo',  char: 'M', materialFactor: 365.2425 / 12, elecFactor: 120 * 365.2425 / 12 },
+  year:  { label: 'Year',  suffix: '/yr',  char: 'Y', materialFactor: 365.2425,      elecFactor: 120 * 365.2425 },
 }
 
 export function useProductivity(projectId, projectBuildings) {

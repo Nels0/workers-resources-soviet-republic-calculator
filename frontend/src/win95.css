@@ -284,12 +284,7 @@ body {
 }
 
 .win95-table tbody tr:hover {
-  background: var(--win95-shadow);
-  color: white;
-}
-
-.win95-table tbody tr:hover a {
-  color: white;
+  background: #dde4f0;
 }
 
 .win95-table td.num {
@@ -375,12 +370,7 @@ body {
 }
 
 .win95-table tr.selected td {
-  background: var(--win95-blue);
-  color: white;
-}
-
-.win95-table tr.selected .win95-muted {
-  color: #c0c8e0;
+  background: #b8cce8;
 }
 
 /* Dropdown list for autocomplete */

@@ -45,16 +45,20 @@ function ResourceFlowsTable({
   }
 
   const flowOpts = { applyProductivity: true, applyNormalize: normalizeView, period }
-  const suffix = PERIODS[period]?.suffix || '/mo'
+  const periodChar = PERIODS[period]?.char || 'M'
 
   function importPrice(r) { return parseFloat(prices?.[String(r.id)]?.import) || 0 }
   function exportPrice(r) { return parseFloat(prices?.[String(r.id)]?.export) || 0 }
   const hasAnyPrice = showRubles && activeResources.some(r => importPrice(r) > 0 || exportPrice(r) > 0)
 
-  function periodUnit(r) {
-    const base = r.unit === 'MW' ? 'MWh' : r.unit
-    const workerPart = normalizeView ? '/worker' : ''
-    return base + workerPart + suffix
+  function unitBase(r) { return r.unit === 'MW' ? 'MWh' : r.unit }
+
+  function renderResourceHeader(r) {
+    return (
+      <th key={r.id} style={{ width: '8em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+        {r.name} {unitBase(r)}/{periodChar}<span style={{ visibility: normalizeView ? 'visible' : 'hidden' }}>/w</span>
+      </th>
+    )
   }
 
   function renderNetCell(net) {
@@ -121,14 +125,15 @@ function ResourceFlowsTable({
 
   return (
     <div className="win95-inset win95-table-wrap">
-      <table className="win95-table win95-table-static">
+      <table className="win95-table win95-table-static" style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr>
-            <th style={{ width: '100%', textAlign: 'left' }}>Building</th>
-            {showMove && <th></th>}
-            <th>Qty</th>
-            {activeResources.map(r => <th key={r.id}>{r.name} ({periodUnit(r)})</th>)}
-            {hasAnyPrice && <th>₽ Net</th>}
+            <th style={{ textAlign: 'left' }}>Building</th>
+            {showMove && <th style={{ width: '5em' }}></th>}
+            <th style={{ width: '4em' }}>Qty</th>
+            {showProductivityOverride && <th style={{ width: '220px' }}>Staffing</th>}
+            {activeResources.map(renderResourceHeader)}
+            {hasAnyPrice && <th style={{ width: '9em' }}>₽ Net</th>}
           </tr>
         </thead>
         <tbody>
@@ -150,24 +155,12 @@ function ResourceFlowsTable({
 
             return (
               <tr key={i}>
-                <td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {onBuildingClick
                     ? <button className="win95-link-btn" onClick={() => onBuildingClick(b.id)}>{b.name}</button>
                     : b.name
                   }
                   {' '}<span className="win95-muted" style={{ fontSize: '0.85em' }}>{b.source_file}</span>
-                  {showProductivityOverride && (
-                    <div style={{ marginTop: 2 }}>
-                      <BlockSlider
-                        min={0} max={1} step={0.01}
-                        value={Math.min(1, buildingProductivityOverrides?.[pb.position] ?? 1.0)}
-                        onChange={factor => onBuildingProductivityChange(pb.position, factor)}
-                        label={v => `${Math.round(v * 100)}%`}
-                        hasOverride={hasOverride}
-                        onClear={() => onBuildingProductivityClear(pb.position)}
-                      />
-                    </div>
-                  )}
                 </td>
                 {showMove && <td>{renderMoveDropdown(pb)}</td>}
                 <td className="num">
@@ -185,6 +178,18 @@ function ResourceFlowsTable({
                     : pb.quantity
                   }
                 </td>
+                {showProductivityOverride && (
+                  <td>
+                    <BlockSlider
+                      min={0} max={1} step={0.01}
+                      value={Math.min(1, buildingProductivityOverrides?.[pb.position] ?? 1.0)}
+                      onChange={factor => onBuildingProductivityChange(pb.position, factor)}
+                      label={v => `${Math.round(v * 100)}%`}
+                      hasOverride={hasOverride}
+                      onClear={() => onBuildingProductivityClear(pb.position)}
+                    />
+                  </td>
+                )}
                 {activeResources.map(r => (
                   <td key={r.id} className="num">{renderNetCell(getNetFlow(b, pb, r, flowOpts))}</td>
                 ))}
@@ -198,8 +203,9 @@ function ResourceFlowsTable({
         <tfoot>
           <tr style={{ background: '#e8e8e8' }}>
             <td style={{ fontWeight: 'bold' }}>Net</td>
-            <td></td>
             {showMove && <td></td>}
+            <td></td>
+            {showProductivityOverride && <td></td>}
             {activeResources.map(r => (
               <td key={r.id} className="num">{renderNetCell(totals[r.id])}</td>
             ))}

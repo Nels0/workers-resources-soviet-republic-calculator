@@ -47,7 +47,7 @@ function ChainCard({
 
   return (
     <div className="win95-groupbox" style={{ marginBottom: 6 }}>
-      <div className="win95-groupbox-title" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="win95-groupbox-title" style={{ display: 'flex' }}>
         <input
           className="win95-input"
           style={{ flex: 1, minWidth: 80, padding: '1px 4px' }}
@@ -56,11 +56,14 @@ function ChainCard({
           onBlur={() => onCommitName(chain.id)}
           onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
         />
-        <label style={{ fontSize: '0.8em', display: 'flex', alignItems: 'center', gap: 2, whiteSpace: 'nowrap' }}>
+      </div>
+      <div className="win95-toolbar" style={{ borderBottom: '1px solid #808080', marginBottom: 4 }}>
+        <label style={{ fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 3 }}>
           <input type="checkbox" checked={chainProd}
             onChange={e => onToggleFactor(chain.id, 'productivity', e.target.checked)} />
           Prod.
         </label>
+        <span style={{ flex: 1 }} />
         <button className="win95-btn" style={{ fontSize: '0.85em', padding: '1px 4px' }}
           onClick={() => onMoveUp(chain.id)} title="Move up">▲</button>
         <button className="win95-btn" style={{ fontSize: '0.85em', padding: '1px 4px' }}
@@ -68,7 +71,7 @@ function ChainCard({
         <button className="win95-btn" style={{ fontSize: '0.85em', padding: '1px 6px' }}
           onClick={() => onDissolve(chain.id)}>Dissolve</button>
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <ResourceFlowsTable
             pbs={chainPbs}
@@ -91,16 +94,21 @@ function ChainCard({
           />
         </div>
         <div style={{ flex: '0 0 auto' }}>
-          {economicsLoading && <div className="win95-statusbar">Computing…</div>}
-          <ChainEconomicsPanel
-            economics={economics}
-            period={period}
-            prices={prices}
-            included={included}
-            onToggleIncluded={onToggleIncluded}
-            chainPbs={chainPbs}
-            buildingMap={buildingMap}
-          />
+          {economicsLoading
+            ? <div className="win95-statusbar">Computing…</div>
+            : (
+              <ChainEconomicsPanel
+                economics={economics}
+                period={period}
+                prices={prices}
+                included={included}
+                onToggleIncluded={onToggleIncluded}
+                chainPbs={chainPbs}
+                buildingMap={buildingMap}
+                buildingProductivityOverrides={relevantOverrides}
+              />
+            )
+          }
         </div>
       </div>
     </div>
@@ -180,7 +188,7 @@ function ChainBuilder({
   return (
     <div className="win95-groupbox" style={{ marginTop: 8 }}>
       <div className="win95-groupbox-title">Chain Builder</div>
-      <div style={{ padding: '4px 8px 6px', display: 'flex', gap: 4 }}>
+      <div className="win95-toolbar">
         <button className="win95-btn" onClick={handleAutoDetectClick} disabled={savingChains}>
           Auto-detect chains
         </button>
@@ -190,9 +198,17 @@ function ChainBuilder({
         <button className="win95-btn" onClick={onCreateChain} disabled={savingChains}>
           New chain
         </button>
+        {savingChains && (
+          <span className="win95-muted" style={{ marginLeft: 'auto', fontSize: '0.85em' }}>
+            Saving chains…
+          </span>
+        )}
+        {chainError && (
+          <span style={{ marginLeft: 'auto', fontSize: '0.85em', color: '#c00000' }}>
+            {chainError}
+          </span>
+        )}
       </div>
-      {savingChains && <div className="win95-statusbar">Saving chains…</div>}
-      {chainError && <div className="win95-statusbar" style={{ color: '#c00000' }}>{chainError}</div>}
 
       {sortedChains.map(chain => {
         const factors = getChainFactors(chain.id)

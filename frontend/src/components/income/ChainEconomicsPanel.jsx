@@ -1,6 +1,6 @@
 import { PERIODS } from '../../hooks/useProductivity'
 
-function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncluded, chainPbs, buildingMap }) {
+function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncluded, chainPbs, buildingMap, buildingProductivityOverrides }) {
   if (!economics) return null
 
   const { resources, produced, consumed, net, coverage, buildingUtilization, buildingLimitedBy } = economics
@@ -10,6 +10,8 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
   if (nonZero.length === 0) return null
 
   const suffix = PERIODS[period]?.suffix || '/mo'
+  const periodChar = PERIODS[period]?.char || 'M'
+  function unitBase(r) { return r.unit === 'MW' ? 'MWh' : r.unit }
   const hasCoverage = nonZero.some(r => coverage[String(r.id)] != null)
 
   function importPrice(r) { return parseFloat(prices?.[String(r.id)]?.import) || 0 }
@@ -34,22 +36,35 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
   const netRubles = exportRubles - importRubles
   const netRubleColor = netRubles > 0 ? '#000080' : netRubles < 0 ? '#c00000' : undefined
 
+  let totalEffectiveWorkers = 0
+  if (chainPbs && buildingMap) {
+    for (const pb of chainPbs) {
+      const b = buildingMap[pb.buildingId]
+      if (!b || !b.workers_needed) continue
+      const cfactor = parseFloat(buildingUtilization?.[String(pb.position)] ?? 1.0)
+      const staffing = buildingProductivityOverrides?.[pb.position] ?? 1.0
+      totalEffectiveWorkers += b.workers_needed * pb.quantity * cfactor * staffing
+    }
+  }
+  const netRublesPerWorker = totalEffectiveWorkers > 0 ? netRubles / totalEffectiveWorkers : null
+
   const bottleneckedBuildings = Object.entries(buildingUtilization || {})
 
   return (
-    <div>
+    <div className="win95-groupbox" style={{ marginTop: 0 }}>
+      <div className="win95-groupbox-title">Chain Economics</div>
       <div className="win95-inset win95-table-wrap" style={{ marginTop: 4 }}>
-        <table className="win95-table win95-table-static">
+        <table className="win95-table win95-table-static" style={{ tableLayout: 'fixed', width: 'auto' }}>
           <thead>
             <tr>
-              <th>Resource</th>
-              <th>Produced</th>
-              <th>Consumed</th>
-              <th>Net</th>
+              <th style={{ width: '9em' }}>Resource</th>
+              <th style={{ width: '6em' }}>Produced</th>
+              <th style={{ width: '6em' }}>Consumed</th>
+              <th style={{ width: '8em' }}>Net</th>
               {hasCoverage && (
-                <th title="Internal supply / internal demand for resources traded within this chain">Internal %</th>
+                <th style={{ width: '4.5em' }} title="Internal supply / internal demand for resources traded within this chain">Internal %</th>
               )}
-              {hasAnyPrice && <th title="Include in ₽ totals">☐</th>}
+              {hasAnyPrice && <th style={{ width: '2em' }} title="Include in ₽ totals">☐</th>}
             </tr>
           </thead>
           <tbody>
@@ -69,7 +84,7 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
                   const surplus = Math.round(n * 100) / 100
                   coverageCell = (
                     <span style={{ color: '#000080' }}
-                      title={`${pct - 100}% excess — ${surplus} ${r.unit}${suffix} exported from chain`}>
+                      title={`${pct - 100}% excess — ${surplus} ${unitBase(r)}/${periodChar} exported from chain`}>
                       +{pct - 100}%
                     </span>
                   )
@@ -85,7 +100,10 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
 
               return (
                 <tr key={rid}>
-                  <td>{r.name} <span className="win95-muted" style={{ fontSize: '0.85em' }}>({r.unit}{suffix})</span></td>
+                  <td style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    {r.name}
+                    <span className="win95-muted" style={{ fontSize: '0.85em' }}> {unitBase(r)}/{periodChar}</span>
+                  </td>
                   <td className="num">{produced[rid] ? Math.round(produced[rid] * 100) / 100 : ''}</td>
                   <td className="num">{consumed[rid] ? Math.round(consumed[rid] * 100) / 100 : ''}</td>
                   <td className="num" style={{ color: netColor }}>
@@ -137,6 +155,11 @@ function ChainEconomicsPanel({ economics, period, prices, included, onToggleIncl
             Net: ₽{netRubles >= 0 ? '+' : ''}{Math.round(netRubles * 100) / 100}{suffix}
             {hasMissingPrice && <span className="win95-muted"> (+?)</span>}
           </span>
+          {netRublesPerWorker !== null && (
+            <span className="win95-muted">
+              ₽{netRublesPerWorker >= 0 ? '+' : ''}{Math.round(netRublesPerWorker * 100) / 100}/w/{periodChar}
+            </span>
+          )}
         </div>
       )}
     </div>
